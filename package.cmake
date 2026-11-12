@@ -10,6 +10,7 @@ set(PACKAGE_SOURCES
     AnbernicDisplay.cpp
     AnbernicRows.cpp
     AnbernicInput.cpp
+    AnbernicProfile.cpp
 )
 set(PACKAGE_ENTRY AnbernicPackage.cpp)
-set(PACKAGE_LINK_DEPS deki-input)
+set(PACKAGE_LINK_DEPS deki-input deki-rendering)

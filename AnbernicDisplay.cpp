@@ -18,6 +18,7 @@
 
 #include <deki/LogSystem.h>
 #include <deki/Time.h>
+#include "AnbernicProfile.h"
 #include "AnbernicRows.h"
 #include "AnbernicTimeProvider.h"
 
@@ -293,6 +294,7 @@ void AnbernicDisplay::Present(const uint8_t* framebuffer, int width, int height,
     {
         return;
     }
+    ProfileFrame();
 
     // Wait while the thread still has the frame before this one waiting. The
     // free buffer is the game's alone, so it is filled outside the lock.
@@ -373,6 +375,7 @@ void AnbernicDisplay::Draw(const Frame& frame)
     const int count = outW / scale;
     const size_t srcStride = static_cast<size_t>(frame.width) * BytesPerPixel(frame.format);
 
+    const uint64_t drawStart = Profiling() ? ProfileNowUs() : 0;
     uint8_t* page = m_Map + static_cast<size_t>(m_BackPage) * m_Stride * m_PanelHeight;
 
     // Each screen row widened straight into the `scale` panel rows it covers.
@@ -386,6 +389,14 @@ void AnbernicDisplay::Draw(const Frame& frame)
                                                         static_cast<size_t>(originX) * 4);
             WidenRow(src, frame.format, count, scale, false, out);
         }
+    }
+
+    if (drawStart != 0)
+    {
+        const uint64_t us = ProfileNowUs() - drawStart;
+        std::lock_guard<std::mutex> lock(m_ShownMutex);
+        m_DrawUs += us;
+        ++m_Draws;
     }
 
     if (m_Pages > 1)
@@ -442,6 +453,19 @@ bool AnbernicDisplay::GetFramesShown(uint64_t* frames, uint64_t* lastShownUs) co
         *lastShownUs = m_FrameShownAtUs;
     }
     return m_Initialized;
+}
+
+uint64_t AnbernicDisplay::TakeDrawUs(uint32_t* draws)
+{
+    std::lock_guard<std::mutex> lock(m_ShownMutex);
+    const uint64_t us = m_DrawUs;
+    if (draws)
+    {
+        *draws = m_Draws;
+    }
+    m_DrawUs = 0;
+    m_Draws = 0;
+    return us;
 }
 
 void AnbernicDisplay::CountShown()
@@ -553,6 +577,14 @@ uint8_t* AnbernicDisplay::GetRenderBuffer(int32_t*, int32_t*)
 bool AnbernicDisplay::GetFramesShown(uint64_t*, uint64_t*) const
 {
     return false;
+}
+uint64_t AnbernicDisplay::TakeDrawUs(uint32_t* draws)
+{
+    if (draws)
+    {
+        *draws = 0;
+    }
+    return 0;
 }
 void AnbernicDisplay::GetDisplaySize(int32_t* width, int32_t* height) const
 {

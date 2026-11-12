@@ -3,6 +3,7 @@
 
 #if !defined(DEKI_EDITOR) && defined(DEKI_PACKAGE_ANBERNIC)
 #include "AnbernicDisplay.h"
+#include "AnbernicProfile.h"
 #include <deki/Engine.h>
 #include <memory>
 #endif
@@ -33,6 +34,10 @@ void AnbernicDisplaySetup::Setup(SetupCallback onComplete)
     if (s_AnbernicDisplay->Initialize(DEKI_SCREEN_WIDTH, DEKI_SCREEN_HEIGHT))
     {
         Deki::Engine::GetInstance().SetDisplay(s_AnbernicDisplay.get(), "Anbernic");
+        if (ProfileRequested())
+        {
+            StartProfile(s_AnbernicDisplay.get());
+        }
         onComplete(true);
     }
     else

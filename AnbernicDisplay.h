@@ -67,6 +67,10 @@ private:
     mutable std::mutex m_ShownMutex;
     uint64_t m_FramesShown = 0;
     uint64_t m_FrameShownAtUs = 0;
+    // Time the present thread spent copying frames to the panel, for the
+    // profile report (TakeDrawUs); under m_ShownMutex.
+    uint64_t m_DrawUs = 0;
+    uint32_t m_Draws = 0;
 
     // The game's frames, in three buffers lent to it: the one it draws into,
     // one waiting for the present thread, and the one the thread is drawing.
@@ -126,6 +130,9 @@ public:
     /// Counted by the present thread as each frame goes up: at its flip, or
     /// as it is written where there is one page.
     bool GetFramesShown(uint64_t* frames, uint64_t* lastShownUs) const override;
+    /// Microseconds the present thread spent copying frames to the panel (not
+    /// waiting for the panel) since the last call, and in how many frames.
+    uint64_t TakeDrawUs(uint32_t* draws);
 
     // Overlays are not used: nothing in the engine creates one.
     void* CreateUIOverlay(int32_t, int32_t) override { return nullptr; }
