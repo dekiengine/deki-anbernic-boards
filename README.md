@@ -47,7 +47,7 @@ The app is then in `generated/build/anbernic_rg40xx_h/APPS/`, named after the pr
 | `<Name>/DekiGame` | The game, a static AArch64 Linux executable |
 | `<Name>/flash/` | The game's data: the project settings, the boot scene and the assets (`F:/` on the handheld) |
 | `<Name>/.deki-app` | Says the editor made this folder, so a later Install may replace it |
-| `Imgs/<Name>.png` | The Apps list's picture, the Deki cat |
+| `Imgs/<Name>.png` | The Apps list's picture, the Deki cat, 240x180 like the stock apps' |
 
 The game also writes `dekigame.log` (its own log) and the files it saves into its folder on the card.
 
