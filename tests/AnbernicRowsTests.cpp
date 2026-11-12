@@ -1,5 +1,7 @@
 // The display's row widening: a screen row as the panel's ARGB8888, each
-// pixel scaled up and, on the Anbernic Mini's upside-down panel, turned round.
+// pixel scaled up and, when asked, turned round. The RG40XX H's panel is the
+// right way up, so its display never asks, but WidenRow still can, and these
+// keep both ways right.
 //
 // Built for the desktop these pin the plain path. Built for the Anbernic (the
 // same file, cross-compiled), WidenRow takes NEON for ARGB8888 at 1x and 2x,
@@ -95,8 +97,9 @@ TEST(AnbernicRows, NeonOnlyWhereTheCoreHasIt)
     EXPECT_FALSE(WidensWithNeon(ColorFormat::RGB565, 2));
 }
 
-// The Anbernic Mini's own case (320 at 2x, turned) and every length round it:
-// each pixel the same as the plain path, and nothing outside the row written.
+// A 320-pixel game at 2x, as the RG40XX H's 640-pixel panel shows one, and
+// every length round it, both ways round: each pixel the same as the plain
+// path, and nothing outside the row written.
 TEST(AnbernicRows, WidenRowMatchesThePlainPathPixelForPixel)
 {
     int compared = 0;

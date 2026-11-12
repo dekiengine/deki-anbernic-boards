@@ -1,12 +1,12 @@
 // What the Anbernic builder writes and does without an Anbernic, a cross compiler or
 // an SD card: the toolchain file and the CMake it generates from the shipped
-// platform, the MainUI app it packs, the cards it finds and how it installs on
-// one (fake folders here), and that the framework id hands anbernic_mini to it
-// rather than to the desktop builder.
+// platform, the stock firmware app it packs, the cards it finds and how it
+// installs on one (fake folders here), and that the framework id hands
+// anbernic_rg40xx_h to it rather than to the desktop builder.
 //
-// A mistake here shows up on the handheld as an app MainUI does not list, a
-// game built for the wrong CPU, or an install that deleted something else on
-// the card, so it is worth pinning.
+// A mistake here shows up on the handheld as a game the Apps list does not
+// show, a game built for the wrong CPU, or an install that deleted something
+// else on the card, so it is worth pinning.
 
 #include <gtest/gtest.h>
 
@@ -16,9 +16,8 @@
 #include <deki-editor/build/BuilderDispatch.h>
 #include <deki-editor/build/PlatformConfig.h>
 
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -62,10 +61,21 @@ size_t Count(const std::string& text, const std::string& part)
     return n;
 }
 
-PlatformConfig AnbernicMini()
+size_t EntriesIn(const fs::path& dir)
+{
+    size_t n = 0;
+    for ([[maybe_unused]] const auto& e : fs::directory_iterator(dir))
+    {
+        ++n;
+    }
+    return n;
+}
+
+PlatformConfig Rg40xxH()
 {
     PlatformConfig config;
-    EXPECT_TRUE(PlatformFromJson(Read(kPackage / "platforms" / "anbernic_mini" / "anbernic_mini.json"), config));
+    EXPECT_TRUE(
+        PlatformFromJson(Read(kPackage / "platforms" / "anbernic_rg40xx_h" / "anbernic_rg40xx_h.json"), config));
     return config;
 }
 
@@ -136,9 +146,11 @@ private:
 
 TEST(AnbernicBuilder, TheShippedPlatformIsTheAnbernicBuildersAndValid)
 {
-    const PlatformConfig config = AnbernicMini();
-    EXPECT_EQ(config.id, "anbernic_mini");
+    const PlatformConfig config = Rg40xxH();
+    EXPECT_EQ(config.id, "anbernic_rg40xx_h");
     EXPECT_EQ(config.framework, "anbernic");
+    EXPECT_EQ(config.screenWidth, 640);
+    EXPECT_EQ(config.screenHeight, 480);
     AnbernicBuilder builder;
     for (const auto& problem : builder.ValidatePlatform(config))
     {
@@ -155,50 +167,67 @@ TEST(AnbernicBuilder, TheShippedPlatformIsTheAnbernicBuildersAndValid)
 
 TEST(AnbernicBuilder, TheFrameworkIdPicksItOverTheDesktopBuilder)
 {
-    // anbernic_mini provides hosted, as the simulator does; only the
+    // anbernic_rg40xx_h provides hosted, as the simulator does; only the
     // framework decides, so the desktop builder never builds it.
     AnbernicBuilder anbernic;
     StubBuilder native("native");
     StubBuilder espidf("espidf");
     const std::vector<ITargetBuilder*> all{ &native, &espidf, &anbernic };
-    EXPECT_EQ(SelectBuilder(all, AnbernicMini().framework), &anbernic);
+    EXPECT_EQ(SelectBuilder(all, Rg40xxH().framework), &anbernic);
     EXPECT_EQ(SelectBuilder(all, "native"), &native);
 }
 
 TEST(AnbernicBuilder, APrefixItDoesNotInstallOrAnOddCpuFlagIsRefused)
 {
     AnbernicBuilder builder;
-    PlatformConfig other = AnbernicMini();
-    other.SetOption("toolchainPrefix", "aarch64-none-linux-gnu-");
+    // The 32-bit toolchain a Miyoo uses is not the one this builder installs.
+    PlatformConfig other = Rg40xxH();
+    other.SetOption("toolchainPrefix", "arm-none-linux-gnueabihf-");
     EXPECT_FALSE(builder.ValidatePlatform(other).empty());
 
-    PlatformConfig none = AnbernicMini();
+    PlatformConfig none = Rg40xxH();
     none.SetOption("toolchainPrefix", "");
     EXPECT_FALSE(builder.ValidatePlatform(none).empty());
 
     // cpuFlags land in the toolchain file between quotes.
-    for (const char* bad : { "-march=armv7-a \"; message(x)", "-mfpu=${X}", "march=armv7-a", "-O2;-g" })
+    for (const char* bad : { "-mcpu=cortex-a53 \"; message(x)", "-mcpu=${X}", "mcpu=cortex-a53", "-O2;-g" })
     {
-        PlatformConfig c = AnbernicMini();
+        PlatformConfig c = Rg40xxH();
         c.SetOption("cpuFlags", bad);
         EXPECT_FALSE(builder.ValidatePlatform(c).empty()) << bad;
     }
+}
+
+TEST(AnbernicBuilder, ThePlatformIsDescribedFromItsOptions)
+{
+    AnbernicBuilder builder;
+    const auto rows = builder.DescribePlatform(Rg40xxH());
+    ASSERT_EQ(rows.size(), 4u);
+    EXPECT_EQ(rows[0].first, "Toolchain");
+    EXPECT_EQ(rows[0].second, std::string("aarch64-none-linux-gnu- (Arm GNU ") + kAnbernicCompilerVersion + ")");
+    EXPECT_EQ(rows[1].first, "CPU");
+    EXPECT_EQ(rows[1].second, "-mcpu=cortex-a53");
+    EXPECT_EQ(rows[2].first, "Linking");
+    EXPECT_EQ(rows[2].second, "static");
+    EXPECT_EQ(rows[3].first, "Output");
+    EXPECT_EQ(rows[3].second, "App in Roms/APPS (stock firmware)");
+    EXPECT_TRUE(Contains(builder.GetDescription(), "stock firmware"));
 }
 
 // --- The toolchain file and the configure line ---
 
 TEST(AnbernicBuilder, TheToolchainFileComesFromTheFrameworkOptions)
 {
-    const std::string text = AnbernicBuilder::ToolchainFileText(AnbernicMini(), "C:\\tc\\bin");
+    const std::string text = AnbernicBuilder::ToolchainFileText(Rg40xxH(), "C:\\tc\\bin");
     EXPECT_TRUE(Contains(text, "set(CMAKE_SYSTEM_NAME Linux)\n"));
-    EXPECT_TRUE(Contains(text, "set(CMAKE_SYSTEM_PROCESSOR arm)\n"));
-    EXPECT_TRUE(Contains(text, "set(_DEKI_TOOLS \"C:/tc/bin/arm-none-linux-gnueabihf-\")\n"));
+    EXPECT_TRUE(Contains(text, "set(CMAKE_SYSTEM_PROCESSOR aarch64)\n"));
+    EXPECT_TRUE(Contains(text, "set(_DEKI_TOOLS \"C:/tc/bin/aarch64-none-linux-gnu-\")\n"));
 #ifdef _WIN32
     EXPECT_TRUE(Contains(text, "set(CMAKE_CXX_COMPILER \"${_DEKI_TOOLS}g++.exe\")\n"));
 #else
     EXPECT_TRUE(Contains(text, "set(CMAKE_CXX_COMPILER \"${_DEKI_TOOLS}g++\")\n"));
 #endif
-    const std::string cpu = "-mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard";
+    const std::string cpu = "-mcpu=cortex-a53";
     EXPECT_TRUE(Contains(text, "set(CMAKE_C_FLAGS_INIT \"" + cpu + "\")\n"));
     EXPECT_TRUE(Contains(text, "set(CMAKE_CXX_FLAGS_INIT \"" + cpu + "\")\n"));
     EXPECT_TRUE(Contains(text, "set(CMAKE_EXE_LINKER_FLAGS_INIT \"-static\")\n"));
@@ -206,7 +235,7 @@ TEST(AnbernicBuilder, TheToolchainFileComesFromTheFrameworkOptions)
     // No optimisation here: that is the platform's cxxFlags, once.
     EXPECT_FALSE(Contains(text, "-O"));
 
-    PlatformConfig dynamic = AnbernicMini();
+    PlatformConfig dynamic = Rg40xxH();
     dynamic.SetOptionBool("static", false);
     EXPECT_FALSE(Contains(AnbernicBuilder::ToolchainFileText(dynamic, "/tc/bin"), "-static"));
 }
@@ -214,10 +243,10 @@ TEST(AnbernicBuilder, TheToolchainFileComesFromTheFrameworkOptions)
 TEST(AnbernicBuilder, ItConfiguresWithNinjaForReleaseAndItsOwnToolchainFile)
 {
     AnbernicBuilder builder;
-    const std::string line = builder.ConfigureCommand("C:\\p\\generated\\build\\anbernic_mini");
+    const std::string line = builder.ConfigureCommand("C:\\p\\generated\\build\\anbernic_rg40xx_h");
     EXPECT_TRUE(Contains(line, " -G Ninja "));
     EXPECT_TRUE(Contains(line, " -DCMAKE_BUILD_TYPE=Release"));
-    EXPECT_TRUE(Contains(line, "\"-DCMAKE_TOOLCHAIN_FILE=C:/p/generated/build/anbernic_mini/toolchain.cmake\""));
+    EXPECT_TRUE(Contains(line, "\"-DCMAKE_TOOLCHAIN_FILE=C:/p/generated/build/anbernic_rg40xx_h/toolchain.cmake\""));
     EXPECT_TRUE(Contains(line, "-DCMAKE_MAKE_PROGRAM="));
     EXPECT_TRUE(Contains(line, "-DDEKI_GXX16="));
     EXPECT_TRUE(Contains(line, "-DDEKI_ENGINE_PATH="));
@@ -280,7 +309,7 @@ TEST_F(AnbernicBuildFilesTest, OnlyThePlatformsPackagesAreCompiled)
     // Asked for SDL3 and ESP32 too, as a project with those scenes would be:
     // the platform's capabilities leave them out, and its requiresPackages
     // bring the Anbernic package in even though no define named it.
-    const std::string cmake = Generate(AnbernicMini(), { "DEKI_PACKAGE_SDL3", "DEKI_PACKAGE_ESP32_HAL" });
+    const std::string cmake = Generate(Rg40xxH(), { "DEKI_PACKAGE_SDL3", "DEKI_PACKAGE_ESP32_HAL" });
     EXPECT_TRUE(Contains(cmake, "\"${DEKI_PROJECT_ROOT}/packages/deki-anbernic-boards/package.cmake\""));
     // The desktop package is installed but not built in: nothing the Anbernic
     // needs is in it, the game's entry being the engine's.
@@ -294,13 +323,14 @@ TEST_F(AnbernicBuildFilesTest, OnlyThePlatformsPackagesAreCompiled)
     EXPECT_TRUE(Contains(cmake, "target_link_libraries(DekiGame PRIVATE deki-engine-hosted deki-engine-core"));
     EXPECT_TRUE(Contains(cmake, "    DEKI_HOSTED\n"));
     EXPECT_FALSE(Contains(cmake, "SIMULATOR"));
-    EXPECT_TRUE(Contains(cmake, "\"DEKI_SCREEN_WIDTH=320\""));
+    EXPECT_TRUE(Contains(cmake, "\"DEKI_SCREEN_WIDTH=640\""));
+    EXPECT_TRUE(Contains(cmake, "\"DEKI_SCREEN_HEIGHT=480\""));
     EXPECT_TRUE(Contains(cmake, "UNIT_PREFIX \"anbernic\""));
 }
 
 TEST_F(AnbernicBuildFilesTest, ThePlatformsFlagsAreTheOnlyOptimisation)
 {
-    const std::string cmake = Generate(AnbernicMini(), {});
+    const std::string cmake = Generate(Rg40xxH(), {});
     EXPECT_TRUE(Contains(cmake, "set(CMAKE_CXX_FLAGS_RELEASE \"-DNDEBUG\")\n"));
     EXPECT_TRUE(Contains(cmake, "set(CMAKE_C_FLAGS_RELEASE \"-DNDEBUG\")\n"));
     EXPECT_TRUE(Contains(cmake, "\"$<$<COMPILE_LANGUAGE:CXX>:-O3>\""));
@@ -312,49 +342,39 @@ TEST_F(AnbernicBuildFilesTest, ThePlatformsFlagsAreTheOnlyOptimisation)
     EXPECT_TRUE(Contains(cmake, "target_link_options(DekiGame PRIVATE -s)"));
 }
 
-// The platform's 3D tile size (deki-3d's DEKI_3D_TILE_SIZE: 64-pixel tiles
-// beat 32 on an Anbernic Mini) reaches the code the game compiles.
-TEST_F(AnbernicBuildFilesTest, ThePlatformsTileSizeIsTheGamesDefine)
-{
-    const std::string cmake = Generate(AnbernicMini(), {});
-    const size_t defines = cmake.find("target_compile_definitions(DekiGame PRIVATE");
-    ASSERT_NE(defines, std::string::npos);
-    EXPECT_NE(cmake.find("    DEKI_3D_TILE_SIZE=64\n", defines), std::string::npos);
-}
-
 TEST_F(AnbernicBuildFilesTest, LoggingFollowsTheBuildOptions)
 {
     BuildOptions quiet;
     quiet.enableLogging = false;
-    EXPECT_FALSE(Contains(Generate(AnbernicMini(), {}, quiet), "DEKI_LOG_ENABLED"));
+    EXPECT_FALSE(Contains(Generate(Rg40xxH(), {}, quiet), "DEKI_LOG_ENABLED"));
 
     BuildOptions verbose;
     verbose.enableLogging = true;
     verbose.enableInternalLogging = true;
-    const std::string cmake = Generate(AnbernicMini(), {}, verbose);
+    const std::string cmake = Generate(Rg40xxH(), {}, verbose);
     EXPECT_TRUE(Contains(cmake, "target_compile_definitions(deki-engine-core PUBLIC DEKI_LOG_ENABLED)"));
     EXPECT_TRUE(Contains(cmake, "target_compile_definitions(deki-engine-core PUBLIC DEKI_LOG_INTERNAL_ENABLED)"));
 }
 
 TEST_F(AnbernicBuildFilesTest, TheToolchainFileIsWrittenBesideIt)
 {
-    Generate(AnbernicMini(), {});
-    const fs::path dir = AnbernicBuilder::BuildDirectoryFor(m_Dir.Path().string(), "anbernic_mini");
-    EXPECT_EQ(dir.filename().string(), "anbernic_mini");
+    Generate(Rg40xxH(), {});
+    const fs::path dir = AnbernicBuilder::BuildDirectoryFor(m_Dir.Path().string(), "anbernic_rg40xx_h");
+    EXPECT_EQ(dir.filename().string(), "anbernic_rg40xx_h");
     EXPECT_TRUE(Contains(Read(dir / "toolchain.cmake"), "set(CMAKE_SYSTEM_NAME Linux)"));
 }
 
 TEST_F(AnbernicBuildFilesTest, AChangedToolchainFileStartsTheConfigureAfresh)
 {
     // CMake reads a toolchain file only on the first configure.
-    Generate(AnbernicMini(), {});
-    const fs::path cache = AnbernicBuilder::BuildDirectoryFor(m_Dir.Path().string(), "anbernic_mini") / "build";
+    Generate(Rg40xxH(), {});
+    const fs::path cache = AnbernicBuilder::BuildDirectoryFor(m_Dir.Path().string(), "anbernic_rg40xx_h") / "build";
     Write(cache / "CMakeCache.txt", "old");
-    Generate(AnbernicMini(), {});
+    Generate(Rg40xxH(), {});
     EXPECT_TRUE(fs::exists(cache / "CMakeCache.txt")) << "unchanged settings keep the cache";
 
-    PlatformConfig changed = AnbernicMini();
-    changed.SetOption("cpuFlags", "-march=armv7-a");
+    PlatformConfig changed = Rg40xxH();
+    changed.SetOption("cpuFlags", "-mcpu=cortex-a55");
     Generate(changed, {});
     EXPECT_FALSE(fs::exists(cache / "CMakeCache.txt"));
 }
@@ -362,7 +382,7 @@ TEST_F(AnbernicBuildFilesTest, AChangedToolchainFileStartsTheConfigureAfresh)
 TEST_F(AnbernicBuildFilesTest, AMissingRequiredPackageFailsTheBuild)
 {
     fs::remove_all(m_Dir.Path() / "packages" / "deki-anbernic-boards");
-    EXPECT_FALSE(builder.GenerateBuildFiles(m_Dir.Path().string(), AnbernicMini(), {}));
+    EXPECT_FALSE(builder.GenerateBuildFiles(m_Dir.Path().string(), Rg40xxH(), {}));
 }
 
 TEST_F(AnbernicBuildFilesTest, TheProjectNameComesFromDekiJson)
@@ -370,47 +390,75 @@ TEST_F(AnbernicBuildFilesTest, TheProjectNameComesFromDekiJson)
     EXPECT_EQ(AnbernicBuilder::ProjectName(m_Dir.Path().string()), "My Game!");
 }
 
-// --- The MainUI app ---
+// An older deki-desktop-integration, or any package with a main() of its own,
+// stops the build before it compiles, naming the package: the game's entry is
+// the engine's now, and two would only show as the linker's "multiple
+// definition".
+TEST_F(AnbernicBuildFilesTest, APackageWithItsOwnMainStopsTheBuildNamingIt)
+{
+    const fs::path pkg = m_Dir.Path() / "packages" / "deki-anbernic-boards";
+    Write(pkg / "OldEntry.cpp", "int main(int argc, char* argv[])\n{\n    return 0;\n}\n");
+    builder.SetBuildOptions({});
+    EXPECT_FALSE(builder.GenerateBuildFiles(m_Dir.Path().string(), Rg40xxH(), { "DEKI_PACKAGE_ANBERNIC" }));
+}
 
-TEST(MainUiApp, TheFolderNameIsSafeOnTheCard)
+// A game built as a program shuts its packages down when it quits, freeing
+// their memory (the render system, its passes, the 3D rasteriser's working
+// memory), so the engine's leak check at shutdown finds nothing of theirs.
+// The build leaves the engine's empty stub out, and its own init file
+// defines the shutdown.
+TEST_F(AnbernicBuildFilesTest, TheGameShutsItsPackagesDownWhenItQuits)
+{
+    const std::string cmake = Generate(Rg40xxH(), { "DEKI_PACKAGE_ANBERNIC" });
+    EXPECT_TRUE(Contains(cmake, "set(DEKI_GAME_DEFINES_PACKAGE_SYSTEMS ON)\nadd_subdirectory("));
+    const std::string init =
+        Read(AnbernicBuilder::BuildDirectoryFor(m_Dir.Path().string(), Rg40xxH().id) / "deki_package_init.gen.cpp");
+    EXPECT_TRUE(Contains(init, "extern \"C\" void DekiInitPackageSystems(void)"));
+    EXPECT_TRUE(Contains(init, "extern \"C\" void DekiShutdownPackageSystems(void)"));
+}
+
+// --- The stock firmware app ---
+
+TEST(StockApp, TheFolderNameIsSafeOnTheCard)
 {
     EXPECT_EQ(StockAppFolderName("gpu3d"), "gpu3d");
     EXPECT_EQ(StockAppFolderName("My Game!"), "My_Game");
-    EXPECT_EQ(StockAppFolderName("../../.tmp_update"), "tmp_update");
+    EXPECT_EQ(StockAppFolderName("../../Roms"), "Roms");
     EXPECT_EQ(StockAppFolderName("  "), "DekiGame");
     EXPECT_EQ(StockAppFolderName(""), "DekiGame");
     EXPECT_EQ(StockAppFolderName(std::string(80, 'a')).size(), 48u);
+    // Imgs/ holds every app's picture, so an app may not be named after it.
+    EXPECT_EQ(StockAppFolderName("Imgs"), "Imgs_Game");
+    EXPECT_EQ(StockAppFolderName("imgs"), "imgs_Game");
 }
 
-TEST(MainUiApp, TheLaunchScriptRunsTheGameFromItsFolderWithLFEndings)
+TEST(StockApp, TheLaunchScriptRunsTheGameFromItsFolderWithLFEndings)
 {
-    const std::string script = StockAppLaunchScript("My Game\r\nrm -rf /");
+    const std::string script = StockAppLaunchScript("My Game\r\nrm -rf /", "My_Game");
     EXPECT_EQ(script.find('\r'), std::string::npos);
     EXPECT_EQ(script.rfind("#!/bin/sh\n", 0), 0u);
-    EXPECT_TRUE(Contains(script, "\ncd \"$(dirname \"$0\")\"\n"));
+    // The line an install looks for before it replaces the script.
+    EXPECT_TRUE(Contains(script, std::string("\n") + kStockAppScriptMark));
+    // The script sits beside the folder, so it goes into it first.
+    EXPECT_TRUE(Contains(script, "\ncd \"$(dirname \"$0\")/My_Game\" || exit 1\n"));
     EXPECT_TRUE(Contains(script, "\nchmod +x ./DekiGame 2>/dev/null\n"));
     EXPECT_TRUE(Contains(script, "\n./DekiGame > ./dekigame.out 2>&1\n"));
+    // A card that does not let programs run from it: a copy in /tmp instead.
+    EXPECT_TRUE(Contains(script, "\nif [ \"$code\" -eq 126 ]; then\n"));
+    EXPECT_TRUE(Contains(script, "cp ./DekiGame /tmp/My_Game.DekiGame"));
+    EXPECT_TRUE(Contains(script, "/tmp/My_Game.DekiGame > ./dekigame.out 2>&1\n"));
     // The label is only ever in a comment.
     EXPECT_FALSE(Contains(script, "\nrm -rf /"));
 }
 
-TEST(MainUiApp, TheConfigNamesAnAbsoluteIcon)
+TEST(StockApp, TheShippedIconIsThere)
 {
-    const auto config = nlohmann::json::parse(MainUiConfigJson("My \"Game\"", "My_Game"));
-    EXPECT_EQ(config["label"], "My \"Game\"");
-    EXPECT_EQ(config["icon"], "/mnt/SDCARD/App/My_Game/icon.png");
-    EXPECT_EQ(config["launch"], "launch.sh");
-    EXPECT_TRUE(config.contains("description"));
-}
-
-TEST(MainUiApp, TheShippedIconIsThere)
-{
-    EXPECT_TRUE(fs::is_regular_file(kPackage / "resources" / "mainui" / "icon.png"));
+    EXPECT_TRUE(fs::is_regular_file(kPackage / "resources" / "apps" / "icon.png"));
 }
 
 namespace
 {
-// A built app as AnbernicBuilder packs it, under <dir>/App/<folder>.
+// A built app as AnbernicBuilder packs it, in <dir>/APPS. The APPS folder.
 fs::path MakeApp(const fs::path& dir, const std::string& folder,
                  const std::string& game = "\x7f"
                                            "ELF game")
@@ -426,43 +474,49 @@ fs::path MakeApp(const fs::path& dir, const std::string& folder,
     sources.label = folder;
     sources.folder = folder;
     std::string error;
-    EXPECT_TRUE(AssembleStockApp(sources, dir / "App", error)) << error;
-    return dir / "App" / folder;
+    EXPECT_TRUE(AssembleStockApp(sources, dir / "APPS", error)) << error;
+    return dir / "APPS";
 }
 
-// An Anbernic card as MainUI lays it out, with Onion's own folder or without it
-// (the stock firmware's).
-fs::path MakeCard(const fs::path& root, bool onion = true)
+// An Anbernic card as the stock firmware lays it out, with an app of its own
+// in Roms/APPS that the editor did not install.
+fs::path MakeCard(const fs::path& root)
 {
-    if (onion)
-    {
-        fs::create_directories(root / ".tmp_update");
-    }
-    fs::create_directories(root / "Emu" / "GBA");
-    fs::create_directories(root / "App" / "Terminal");
-    Write(root / "App" / "Terminal" / "config.json", "{}");
+    fs::create_directories(root / "Roms" / "GBA");
+    Write(root / "Roms" / "APPS" / "Terminal.sh", "#!/bin/sh\n./Terminal/terminal\n");
+    Write(root / "Roms" / "APPS" / "Terminal" / "terminal", "terminal");
+    Write(root / "Roms" / "APPS" / "Imgs" / "Terminal.png", "terminal png");
     return root;
 }
 }  // namespace
 
-TEST(MainUiApp, TheAppFolderHasEverythingMainUiNeeds)
+TEST(StockApp, TheAppsFolderHasEverythingTheAppsListNeeds)
 {
     TempDir dir;
-    const fs::path app = MakeApp(dir.Path(), "My_Game");
-    for (const char* f : { "DekiGame", "launch.sh", "config.json", "icon.png", "flash/project_data.bin",
-                           "flash/assets/a.bin", ".deki-app" })
+    const fs::path apps = MakeApp(dir.Path(), "My_Game");
+    EXPECT_TRUE(fs::is_regular_file(apps / "My_Game.sh"));
+    EXPECT_TRUE(fs::is_regular_file(apps / "Imgs" / "My_Game.png"));
+    for (const char* f : { "DekiGame", "flash/project_data.bin", "flash/assets/a.bin", ".deki-app" })
     {
-        EXPECT_TRUE(fs::is_regular_file(app / f)) << f;
+        EXPECT_TRUE(fs::is_regular_file(apps / "My_Game" / f)) << f;
     }
-    EXPECT_EQ(Read(app / "launch.sh").find('\r'), std::string::npos);
-    EXPECT_EQ(nlohmann::json::parse(Read(app / "config.json"))["icon"], "/mnt/SDCARD/App/My_Game/icon.png");
+    // The script starts the game; the folder holds nothing else.
+    for (const char* f : { "launch.sh", "config.json", "icon.png" })
+    {
+        EXPECT_FALSE(fs::exists(apps / "My_Game" / f)) << f;
+    }
+    EXPECT_EQ(Read(apps / "My_Game.sh").find('\r'), std::string::npos);
+    EXPECT_TRUE(Contains(Read(apps / "My_Game.sh"), kStockAppScriptMark));
 
-    // Packing again leaves only the new app: App/ is the build's own.
+    // Packing again leaves only the new app: APPS/ is the build's own.
     MakeApp(dir.Path(), "Renamed");
-    EXPECT_FALSE(fs::exists(dir.Path() / "App" / "My_Game"));
+    EXPECT_FALSE(fs::exists(apps / "My_Game"));
+    EXPECT_FALSE(fs::exists(apps / "My_Game.sh"));
+    EXPECT_FALSE(fs::exists(apps / "Imgs" / "My_Game.png"));
+    EXPECT_TRUE(fs::is_regular_file(apps / "Renamed.sh"));
 }
 
-TEST(MainUiApp, PackingWithoutAPayloadSaysSo)
+TEST(StockApp, PackingWithoutAPayloadSaysSo)
 {
     TempDir dir;
     Write(dir.Path() / "DekiGame", "x");
@@ -473,131 +527,137 @@ TEST(MainUiApp, PackingWithoutAPayloadSaysSo)
     sources.icon = dir.Path() / "icon.png";
     sources.label = sources.folder = "G";
     std::string error;
-    EXPECT_FALSE(AssembleStockApp(sources, dir.Path() / "App", error));
+    EXPECT_FALSE(AssembleStockApp(sources, dir.Path() / "APPS", error));
     EXPECT_TRUE(Contains(error, "boot payload")) << error;
 }
 
 // --- Finding cards, installing ---
 
-TEST(AnbernicCards, OnlyACardWithMainUisLayoutCounts)
+TEST(AnbernicCards, OnlyACardWithRomsAppsCounts)
 {
     TempDir dir;
-    const fs::path onion = MakeCard(dir.Path() / "onion");
-    const fs::path stock = MakeCard(dir.Path() / "stock", false);
-    fs::create_directories(dir.Path() / "apps-only" / "App");
-    fs::create_directories(dir.Path() / "update-only" / ".tmp_update");
-    fs::create_directories(dir.Path() / "update-only" / "App");
+    const fs::path first = MakeCard(dir.Path() / "first");
+    const fs::path second = MakeCard(dir.Path() / "second");
+    fs::create_directories(dir.Path() / "roms-only" / "Roms" / "GBA");
+    fs::create_directories(dir.Path() / "apps-at-top" / "APPS");
     fs::create_directories(dir.Path() / "empty");
-    Write(dir.Path() / "file" / "Emu", "not a folder");
-    fs::create_directories(dir.Path() / "file" / "App");
+    Write(dir.Path() / "file" / "Roms" / "APPS", "not a folder");
 
     std::vector<std::string> roots;
-    for (const char* name : { "apps-only", "onion", "update-only", "stock", "empty", "file", "missing" })
+    for (const char* name : { "roms-only", "second", "apps-at-top", "first", "empty", "file", "missing" })
     {
         roots.push_back((dir.Path() / name).string());
     }
     const std::vector<std::string> cards = AnbernicCardsAmong(roots);
     ASSERT_EQ(cards.size(), 2u);
-    EXPECT_EQ(fs::path(cards[0]), onion);
-    EXPECT_EQ(fs::path(cards[1]), stock);
+    EXPECT_EQ(fs::path(cards[0]), second);
+    EXPECT_EQ(fs::path(cards[1]), first);
 }
 
-// The card list says which system a card has, so a stock card and an Onion
-// card in two readers can be told apart.
-TEST(AnbernicCards, ACardSaysWhetherItHasOnionOrTheStockFirmware)
+TEST(AnbernicCards, AnInstallPutsTheAppInRomsAppsAndChecksIt)
 {
     TempDir dir;
-    EXPECT_EQ(AnbernicCardSystem(MakeCard(dir.Path() / "onion")), "Onion");
-    EXPECT_EQ(AnbernicCardSystem(MakeCard(dir.Path() / "stock", false)), "stock");
-}
-
-TEST(AnbernicCards, AStockCardTakesAnInstallAsOnionsDoes)
-{
-    TempDir dir;
-    const fs::path app = MakeApp(dir.Path(), "My_Game");
-    const fs::path card = MakeCard(dir.Path() / "card", false);
-    std::string error;
-    ASSERT_TRUE(InstallStockApp(app, card, "My_Game", nullptr, nullptr, nullptr, error)) << error;
-    EXPECT_EQ(Read(card / "App" / "My_Game" / "DekiGame"), Read(app / "DekiGame"));
-    EXPECT_FALSE(fs::exists(card / ".tmp_update"));
-}
-
-TEST(AnbernicCards, AnInstallPutsTheAppInAppAndChecksIt)
-{
-    TempDir dir;
-    const fs::path app = MakeApp(dir.Path(), "My_Game");
+    const fs::path apps = MakeApp(dir.Path(), "My_Game");
     const fs::path card = MakeCard(dir.Path() / "card");
+    const fs::path cardApps = card / "Roms" / "APPS";
 
     std::string error;
     std::vector<float> progress;
     ASSERT_TRUE(InstallStockApp(
-        app, card, "My_Game", nullptr, [&](float v, const std::string&) { progress.push_back(v); }, nullptr, error))
+        apps, card, "My_Game", nullptr, [&](float v, const std::string&) { progress.push_back(v); }, nullptr, error))
         << error;
-    for (const char* f : { "DekiGame", "launch.sh", "config.json", "icon.png", "flash/assets/a.bin", ".deki-app" })
+    for (const char* f : { "DekiGame", "flash/project_data.bin", "flash/assets/a.bin", ".deki-app" })
     {
-        EXPECT_EQ(Read(card / "App" / "My_Game" / f), Read(app / f)) << f;
+        EXPECT_EQ(Read(cardApps / "My_Game" / f), Read(apps / "My_Game" / f)) << f;
     }
+    EXPECT_EQ(Read(cardApps / "My_Game.sh"), Read(apps / "My_Game.sh"));
+    EXPECT_EQ(Read(cardApps / "Imgs" / "My_Game.png"), Read(apps / "Imgs" / "My_Game.png"));
     EXPECT_FALSE(progress.empty());
     EXPECT_FLOAT_EQ(progress.back(), 1.0f);
-    // Nothing else on the card changed, and no staging folder is left.
-    EXPECT_EQ(Read(card / "App" / "Terminal" / "config.json"), "{}");
-    EXPECT_TRUE(fs::is_directory(card / ".tmp_update"));
-    size_t entries = 0;
-    for ([[maybe_unused]] const auto& e : fs::directory_iterator(card / "App"))
-    {
-        ++entries;
-    }
-    EXPECT_EQ(entries, 2u);
+
+    // Nothing else on the card changed, and no staging folder or file is left:
+    // Roms/APPS has Terminal, Terminal.sh, Imgs and the new app's two.
+    EXPECT_EQ(Read(cardApps / "Terminal.sh"), "#!/bin/sh\n./Terminal/terminal\n");
+    EXPECT_EQ(Read(cardApps / "Terminal" / "terminal"), "terminal");
+    EXPECT_EQ(Read(cardApps / "Imgs" / "Terminal.png"), "terminal png");
+    EXPECT_TRUE(fs::is_directory(card / "Roms" / "GBA"));
+    EXPECT_EQ(EntriesIn(cardApps), 5u);
+    EXPECT_EQ(EntriesIn(cardApps / "Imgs"), 2u);
 }
 
 TEST(AnbernicCards, ReinstallingReplacesTheEditorsOwnApp)
 {
     TempDir dir;
     const fs::path card = MakeCard(dir.Path() / "card");
+    const fs::path cardApps = card / "Roms" / "APPS";
     std::string error;
     ASSERT_TRUE(InstallStockApp(MakeApp(dir.Path() / "one", "G"), card, "G", nullptr, nullptr, nullptr, error));
-    Write(card / "App" / "G" / "flash" / "stale.bin", "left from before");
+    Write(cardApps / "G" / "flash" / "stale.bin", "left from before");
 
     ASSERT_TRUE(
         InstallStockApp(MakeApp(dir.Path() / "two", "G", "new game"), card, "G", nullptr, nullptr, nullptr, error))
         << error;
-    EXPECT_EQ(Read(card / "App" / "G" / "DekiGame"), "new game");
-    EXPECT_FALSE(fs::exists(card / "App" / "G" / "flash" / "stale.bin"));
+    EXPECT_EQ(Read(cardApps / "G" / "DekiGame"), "new game");
+    EXPECT_FALSE(fs::exists(cardApps / "G" / "flash" / "stale.bin"));
+    EXPECT_TRUE(Contains(Read(cardApps / "G.sh"), kStockAppScriptMark));
 }
 
-TEST(AnbernicCards, AnAppTheEditorDidNotInstallIsLeftAlone)
+TEST(AnbernicCards, AnAppFolderTheEditorDidNotInstallIsLeftAlone)
 {
     TempDir dir;
-    const fs::path app = MakeApp(dir.Path(), "Terminal");
+    const fs::path apps = MakeApp(dir.Path(), "Terminal");
     const fs::path card = MakeCard(dir.Path() / "card");
+    const fs::path cardApps = card / "Roms" / "APPS";
     std::string error;
-    EXPECT_FALSE(InstallStockApp(app, card, "Terminal", nullptr, nullptr, nullptr, error));
+    EXPECT_FALSE(InstallStockApp(apps, card, "Terminal", nullptr, nullptr, nullptr, error));
     EXPECT_TRUE(Contains(error, "not installed by the Deki Editor")) << error;
-    EXPECT_EQ(Read(card / "App" / "Terminal" / "config.json"), "{}");
-    EXPECT_FALSE(fs::exists(card / "App" / "Terminal" / "DekiGame"));
+    EXPECT_EQ(Read(cardApps / "Terminal" / "terminal"), "terminal");
+    EXPECT_FALSE(fs::exists(cardApps / "Terminal" / "DekiGame"));
+    EXPECT_EQ(Read(cardApps / "Terminal.sh"), "#!/bin/sh\n./Terminal/terminal\n");
+    EXPECT_FALSE(fs::exists(cardApps / ".Terminal.deki-install"));
 }
 
-TEST(AnbernicCards, NothingIsWrittenToADriveThatIsNotAAnbernicCard)
+// A script of the same name with no folder beside it: still not the editor's.
+TEST(AnbernicCards, AScriptTheEditorDidNotWriteIsLeftAlone)
 {
     TempDir dir;
-    const fs::path app = MakeApp(dir.Path(), "G");
-    const fs::path notACard = dir.Path() / "usb";
-    fs::create_directories(notACard / "App");
+    const fs::path apps = MakeApp(dir.Path(), "Solo");
+    const fs::path card = MakeCard(dir.Path() / "card");
+    const fs::path cardApps = card / "Roms" / "APPS";
+    Write(cardApps / "Solo.sh", "#!/bin/sh\necho solo\n");
     std::string error;
-    EXPECT_FALSE(InstallStockApp(app, notACard, "G", nullptr, nullptr, nullptr, error));
-    EXPECT_FALSE(fs::exists(notACard / "App" / "G"));
+    EXPECT_FALSE(InstallStockApp(apps, card, "Solo", nullptr, nullptr, nullptr, error));
+    EXPECT_TRUE(Contains(error, "not written by the Deki Editor")) << error;
+    EXPECT_EQ(Read(cardApps / "Solo.sh"), "#!/bin/sh\necho solo\n");
+    EXPECT_FALSE(fs::exists(cardApps / "Solo"));
+    EXPECT_FALSE(fs::exists(cardApps / "Imgs" / "Solo.png"));
+}
+
+TEST(AnbernicCards, NothingIsWrittenToADriveThatIsNotAnAnbernicCard)
+{
+    TempDir dir;
+    const fs::path apps = MakeApp(dir.Path(), "G");
+    const fs::path notACard = dir.Path() / "usb";
+    fs::create_directories(notACard / "APPS");
+    fs::create_directories(notACard / "Roms");
+    std::string error;
+    EXPECT_FALSE(InstallStockApp(apps, notACard, "G", nullptr, nullptr, nullptr, error));
+    EXPECT_TRUE(Contains(error, "not an Anbernic SD card")) << error;
+    EXPECT_FALSE(fs::exists(notACard / "APPS" / "G"));
+    EXPECT_FALSE(fs::exists(notACard / "Roms" / "APPS"));
 }
 
 TEST(AnbernicCards, ACancelledInstallLeavesTheOldAppAndNoStaging)
 {
     TempDir dir;
     const fs::path card = MakeCard(dir.Path() / "card");
+    const fs::path cardApps = card / "Roms" / "APPS";
     std::string error;
     ASSERT_TRUE(InstallStockApp(MakeApp(dir.Path() / "one", "G", "old"), card, "G", nullptr, nullptr, nullptr, error));
     std::atomic<bool> cancel{ true };
     EXPECT_FALSE(InstallStockApp(MakeApp(dir.Path() / "two", "G", "new"), card, "G", nullptr, nullptr, &cancel, error));
-    EXPECT_EQ(Read(card / "App" / "G" / "DekiGame"), "old");
-    EXPECT_FALSE(fs::exists(card / "App" / ".G.deki-install"));
+    EXPECT_EQ(Read(cardApps / "G" / "DekiGame"), "old");
+    EXPECT_FALSE(fs::exists(cardApps / ".G.deki-install"));
 }
 
 // An install names its card as someone wrote it: the editor's tool, a script,
@@ -609,11 +669,11 @@ TEST(AnbernicCards, ACardIsTheSameWithOrWithoutATrailingSeparator)
     EXPECT_TRUE(NamesAnbernicCard(R"(E:\)", "E:"));
     EXPECT_TRUE(NamesAnbernicCard("e:/", "E:"));
     EXPECT_FALSE(NamesAnbernicCard("F:", "E:"));
-    EXPECT_FALSE(NamesAnbernicCard(R"(E:\App)", "E:"));
+    EXPECT_FALSE(NamesAnbernicCard(R"(E:\Roms)", "E:"));
 #else
-    EXPECT_TRUE(NamesAnbernicCard("/media/user/ONION/", "/media/user/ONION"));
-    EXPECT_FALSE(NamesAnbernicCard("/media/user/onion", "/media/user/ONION"));
-    EXPECT_FALSE(NamesAnbernicCard("/media/user/ONION/App", "/media/user/ONION"));
+    EXPECT_TRUE(NamesAnbernicCard("/media/user/SDCARD/", "/media/user/SDCARD"));
+    EXPECT_FALSE(NamesAnbernicCard("/media/user/sdcard", "/media/user/SDCARD"));
+    EXPECT_FALSE(NamesAnbernicCard("/media/user/SDCARD/Roms", "/media/user/SDCARD"));
 #endif
     EXPECT_FALSE(NamesAnbernicCard("", "E:"));
 }
@@ -643,43 +703,16 @@ TEST(AnbernicCards, AnInstallFindsTheProjectsAppUnderAnEarlierName)
         sources.label = sources.folder = folder;
         sources.projectId = projectId;
         std::string error;
-        ASSERT_TRUE(AssembleStockApp(sources, built / "App", error)) << error;
-        ASSERT_TRUE(InstallStockApp(built / "App" / folder, card, folder, nullptr, nullptr, nullptr, error)) << error;
+        ASSERT_TRUE(AssembleStockApp(sources, built / "APPS", error)) << error;
+        ASSERT_TRUE(InstallStockApp(built / "APPS", card, folder, nullptr, nullptr, nullptr, error)) << error;
     };
     install("gpu3d", mine);
     install("Other_Game", other);
     install("Unmarked", "");  // installed before the marker named its project
     install("3d-demo", mine);
 
-    // Terminal, which the editor did not install, is never named either.
+    // Terminal, which the editor did not install, and Imgs are never named.
     EXPECT_EQ(EarlierAppsOfProject(card, mine, "3d-demo"), std::vector<std::string>{ "gpu3d" });
     EXPECT_TRUE(EarlierAppsOfProject(card, other, "Other_Game").empty());
     EXPECT_TRUE(EarlierAppsOfProject(card, "", "3d-demo").empty());
-}
-
-// An older deki-desktop-integration, or any package with a main() of its own,
-// stops the build before it compiles, naming the package: the game's entry is
-// the engine's now, and two would only show as the linker's "multiple
-// definition".
-TEST_F(AnbernicBuildFilesTest, APackageWithItsOwnMainStopsTheBuildNamingIt)
-{
-    const fs::path pkg = m_Dir.Path() / "packages" / "deki-anbernic-boards";
-    Write(pkg / "OldEntry.cpp", "int main(int argc, char* argv[])\n{\n    return 0;\n}\n");
-    builder.SetBuildOptions({});
-    EXPECT_FALSE(builder.GenerateBuildFiles(m_Dir.Path().string(), AnbernicMini(), { "DEKI_PACKAGE_ANBERNIC" }));
-}
-
-// A game built as a program shuts its packages down when it quits, freeing
-// their memory (the render system, its passes, the 3D rasteriser's working
-// memory), so the engine's leak check at shutdown finds nothing of theirs.
-// The build leaves the engine's empty stub out, and its own init file
-// defines the shutdown.
-TEST_F(AnbernicBuildFilesTest, TheGameShutsItsPackagesDownWhenItQuits)
-{
-    const std::string cmake = Generate(AnbernicMini(), { "DEKI_PACKAGE_ANBERNIC" });
-    EXPECT_TRUE(Contains(cmake, "set(DEKI_GAME_DEFINES_PACKAGE_SYSTEMS ON)\nadd_subdirectory("));
-    const std::string init =
-        Read(AnbernicBuilder::BuildDirectoryFor(m_Dir.Path().string(), AnbernicMini().id) / "deki_package_init.gen.cpp");
-    EXPECT_TRUE(Contains(init, "extern \"C\" void DekiInitPackageSystems(void)"));
-    EXPECT_TRUE(Contains(init, "extern \"C\" void DekiShutdownPackageSystems(void)"));
 }

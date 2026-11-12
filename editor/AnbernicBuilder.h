@@ -6,7 +6,7 @@
 // In this package's editor/ folder, so it is compiled into the package's
 // editor-side DLL and registered when a project has the package installed,
 // and never into a game, which leaves editor/ out. It claims the framework id
-// "anbernic"; platforms/anbernic_mini/anbernic_mini.json names it.
+// "anbernic"; platforms/anbernic_rg40xx_h/anbernic_rg40xx_h.json names it.
 //
 // The game is the desktop build's kind of build (one executable, from
 // CMakeGen::GenerateExecutableCMakeLists) cross-compiled for 64-bit ARM Linux:

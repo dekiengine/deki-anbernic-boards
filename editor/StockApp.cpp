@@ -111,6 +111,15 @@ std::string StockAppFolderName(const std::string& projectName)
     {
         out.resize(48);
     }
+    // Imgs/ beside the apps holds every app's picture, so no app may take
+    // that name (the card's file system ignores case).
+    std::string lower = out;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lower == "imgs")
+    {
+        out += "_Game";
+    }
     return out;
 }
 
