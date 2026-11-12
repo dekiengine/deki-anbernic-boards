@@ -1,0 +1,14 @@
+{
+    "Build a game for an Anbernic handheld, stock or Onion OS, and install it on its SD card": "Anbernic の携帯ゲーム機 (標準ファームウェアまたは Onion OS) 向けにゲームをビルドし、SD カードにインストールします",
+    "No Arm GNU Toolchain archive is pinned for this host yet; Anbernic builds need a Windows x86_64 machine for now": "このホスト向けの Arm GNU Toolchain アーカイブはまだ固定されていません。現在、Anbernic のビルドには Windows x86_64 のマシンが必要です",
+    "The cross compiler for the Anbernic Mini (ARMv7, hard float, Linux), from Arm": "Anbernic Mini 用のクロスコンパイラー (ARMv7、ハードフロート、Linux)。Arm が提供しています",
+    "Feeds an Anbernic handheld's buttons to the engine as keys.": "Anbernic の携帯ゲーム機のボタンを、キーとしてエンジンに渡します。",
+    "Anbernic": "Anbernic",
+    "Anbernic Display Setup": "Anbernic ディスプレイ設定",
+    "Anbernic Input Setup": "Anbernic 入力設定",
+    "Panel pixels per screen pixel. 0 scales as large as fits.": "画面の 1 ピクセルあたりのパネルのピクセル数です。0 なら収まる最大まで拡大します。",
+    "Rotate 180": "180 度回転",
+    "Scale": "拡大率",
+    "Shows the game on an Anbernic handheld's screen.": "Anbernic の携帯ゲーム機の画面にゲームを表示します。",
+    "Turn frames 180 degrees. The Anbernic Mini's panel is mounted upside down.": "フレームを 180 度回転します。Anbernic Mini のパネルは上下逆に取り付けられています。"
+}

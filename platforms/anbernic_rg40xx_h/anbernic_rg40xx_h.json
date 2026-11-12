@@ -1,0 +1,33 @@
+{
+  "bootScene": "platforms/anbernic_rg40xx_h/boot.scene",
+  "colorFormat": "ARGB8888",
+  "cxxFlags": [
+    "-O3"
+  ],
+  "displayName": "Anbernic RG40XX H",
+  "externalMemorySize": 536870912,
+  "family": "linux-arm64",
+  "framework": "anbernic",
+  "frameworkOptions": {
+    "cpuFlags": "-mcpu=cortex-a53",
+    "static": true,
+    "toolchainPrefix": "aarch64-none-linux-gnu-"
+  },
+  "id": "anbernic_rg40xx_h",
+  "linkFlags": [
+    "-s"
+  ],
+  "provides": [
+    "hosted",
+    "posix-process",
+    "filesystem",
+    "threads",
+    "anbernic"
+  ],
+  "requiresPackages": [
+    "deki-anbernic-boards"
+  ],
+  "screenDiagonalInches": 4.0,
+  "screenHeight": 480,
+  "screenWidth": 640
+}

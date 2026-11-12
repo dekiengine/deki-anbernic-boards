@@ -1,0 +1,51 @@
+#include "AnbernicInputSetup.h"
+#include <deki/LogSystem.h>
+
+#if !defined(DEKI_EDITOR) && defined(DEKI_PACKAGE_ANBERNIC)
+#include "AnbernicInput.h"
+#include "DekiInput.h"      // from deki-input
+#include "DekiInputInit.h"  // DekiInputInitSystem (from deki-input)
+#include <memory>
+#endif
+
+namespace DekiAnbernic
+{
+
+#if !defined(DEKI_EDITOR) && defined(DEKI_PACKAGE_ANBERNIC)
+
+void AnbernicInputSetup::Setup(SetupCallback onComplete)
+{
+    DEKI_LOG_INFO("AnbernicInputSetup: Opening the buttons");
+
+    auto input = std::make_unique<AnbernicInput>();
+    if (input->Initialize())
+    {
+        // deki-input's namespace and class share the name DekiInput; the alias
+        // names the class (as SDL3InputSetup does).
+        using DekiInputApi = DekiInput::DekiInput;
+        DekiInputApi::SetInput(std::move(input), "Anbernic");
+
+        // The static build links the engine's empty DekiInitPackageSystems(),
+        // so deki-input's dispatch system starts here. Safe to repeat.
+        DekiInputInitSystem();
+
+        onComplete(true);
+    }
+    else
+    {
+        DEKI_LOG_ERROR("AnbernicInputSetup: Failed to open the buttons");
+        onComplete(false);
+    }
+}
+
+#else
+
+void AnbernicInputSetup::Setup(SetupCallback onComplete)
+{
+    // The editor and other targets take input elsewhere.
+    onComplete(true);
+}
+
+#endif
+
+}  // namespace DekiAnbernic

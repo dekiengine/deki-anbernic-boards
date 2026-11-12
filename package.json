@@ -1,0 +1,34 @@
+{
+  "id": "deki-anbernic-boards",
+  "displayName": "Anbernic Boards",
+  "description": "Build targets for Anbernic handhelds: RG40XX H",
+  "minEngine": "0.30.0",
+  "buildDefine": "DEKI_PACKAGE_ANBERNIC",
+  "platformRequires": [
+    "anbernic"
+  ],
+  "requires": [
+    "deki-input"
+  ],
+  "features": [
+    {
+      "id": "display",
+      "displayName": "Display",
+      "defaultEnabled": true,
+      "componentTypes": [
+        "AnbernicDisplaySetup"
+      ]
+    },
+    {
+      "id": "input",
+      "displayName": "Input",
+      "defaultEnabled": true,
+      "componentTypes": [
+        "AnbernicInputSetup"
+      ]
+    }
+  ],
+  "dependencies": {
+    "anbernic": []
+  }
+}

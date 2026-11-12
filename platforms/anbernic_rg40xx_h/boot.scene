@@ -1,0 +1,78 @@
+{
+  "formatVersion": 1,
+  "objects": [
+    {
+      "active": true,
+      "children": [
+        {
+          "active": true,
+          "children": [],
+          "components": [
+            {
+              "properties": {
+                "panelHeight": 480,
+                "panelWidth": 640,
+                "scale": 0
+              },
+              "type": "DekiAnbernic::AnbernicDisplaySetup"
+            }
+          ],
+          "id": 600,
+          "name": "Anbernic Display",
+          "transform": {
+            "rotation": 0.0,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        {
+          "active": true,
+          "children": [],
+          "components": [
+            {
+              "properties": {},
+              "type": "DekiAnbernic::AnbernicInputSetup"
+            }
+          ],
+          "id": 601,
+          "name": "Anbernic Input",
+          "transform": {
+            "rotation": 0.0,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      ],
+      "components": [
+        {
+          "properties": {
+            "setupComponents": [
+              {
+                "id": 600,
+                "typeId": 1535423869
+              },
+              {
+                "id": 601,
+                "typeId": 2982312043
+              }
+            ]
+          },
+          "type": "Deki::PlatformSetupComponent"
+        }
+      ],
+      "id": 1,
+      "name": "Setup",
+      "transform": {
+        "rotation": 0.0,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "x": 0.0,
+        "y": 0.0
+      }
+    }
+  ]
+}
