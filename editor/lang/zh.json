@@ -17,5 +17,7 @@
     "Address": "地址",
     "User": "用户",
     "Card Folder": "存储卡文件夹",
-    "With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this computer's SSH key; the package README says how to add it.": "填写地址后，安装目标中会在 SD 卡旁出现通过 Wi-Fi 连接的掌机。它使用这台电脑的 SSH 密钥登录；添加密钥的方法见包的 README。"
+    "With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this computer's SSH key; the package README says how to add it.": "填写地址后，安装目标中会在 SD 卡旁出现通过 Wi-Fi 连接的掌机。它使用这台电脑的 SSH 密钥登录；添加密钥的方法见包的 README。",
+    "Display": "显示屏",
+    "Resolution": "分辨率"
 }

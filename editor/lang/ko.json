@@ -17,5 +17,7 @@
     "Address": "주소",
     "User": "사용자",
     "Card Folder": "카드 폴더",
-    "With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this computer's SSH key; the package README says how to add it.": "주소를 넣으면 설치 대상에 SD 카드와 함께 Wi-Fi로 연결된 휴대기가 나옵니다. 이 컴퓨터의 SSH 키로 로그인하며, 키를 추가하는 방법은 패키지 README에 있습니다."
+    "With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this computer's SSH key; the package README says how to add it.": "주소를 넣으면 설치 대상에 SD 카드와 함께 Wi-Fi로 연결된 휴대기가 나옵니다. 이 컴퓨터의 SSH 키로 로그인하며, 키를 추가하는 방법은 패키지 README에 있습니다.",
+    "Display": "디스플레이",
+    "Resolution": "해상도"
 }
