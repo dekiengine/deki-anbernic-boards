@@ -15,6 +15,7 @@ namespace DekiAnbernic
 /// games written for a keyboard work unchanged:
 ///
 ///   D-pad    Up / Down / Left / Right     (the left stick too)
+///   Sticks   also read as sticks, left and right (DekiInput::GetStick)
 ///   A        Enter          B       Esc
 ///   X        Space          Y       Tab
 ///   Start    Enter          Select  Backspace
@@ -33,6 +34,7 @@ public:
         int8_t direction = 0;
         int32_t low = 0;  // the axis' range, as the device reports it
         int32_t high = 0;
+        int32_t value = 0;  // where it is now
     };
 
 private:
@@ -67,6 +69,12 @@ public:
     bool IsInitialized() const override { return m_Initialized; }
     bool GetPointerPosition(int32_t* x, int32_t* y) const override;
     bool IsKeyPressed(uint32_t key) const override;
+    /// Stick 0 the left, 1 the right, from the device with buttons.
+    bool GetStick(int stick, float* x, float* y) const override;
+
+    /// Where an axis at `value` is in its range [low, high], from -1 to 1.
+    /// 0 for an axis with no range.
+    static float AxisPosition(int32_t value, int32_t low, int32_t high);
 
     /// The Deki key a button's evdev code reports; 0 for none.
     static uint32_t KeyForCode(uint16_t code);

@@ -5,16 +5,24 @@
 #if defined(__linux__) && !defined(DEKI_EDITOR)
 
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <ctime>
+#include <mutex>
 #include <vector>
 
 #include <unistd.h>
 
 #include <deki/Engine.h>
 #include <deki/LogSystem.h>
+#include <deki/Object.h>
+#include <deki/Scene.h>
+#include <deki/SceneSystem.h>
+#include <deki/Time.h>
 #include <deki/reflection/ComponentRegistry.h>
 #include "AnbernicDisplay.h"
-#include "RenderProfiler.h"  // from deki-rendering
+#include "CameraComponent.h"  // from deki-rendering
+#include "RenderProfiler.h"   // from deki-rendering
 
 namespace DekiAnbernic
 {
@@ -36,6 +44,32 @@ uint64_t s_LongestUs = 0;
 uint32_t s_UpdateMs = 0;
 uint32_t s_RenderMs = 0;
 uint32_t s_PresentMs = 0;
+
+// The per-frame trace, when "profile" says "trace".
+std::FILE* s_Trace = nullptr;
+std::mutex s_TraceMutex;
+int32_t s_ScreenW = 0;
+int32_t s_ScreenH = 0;
+
+// The scene's camera, found as the render system finds it.
+const DekiRendering::CameraComponent* FindCamera()
+{
+    const Deki::Scene* scene = Deki::Engine::GetInstance().GetSceneSystem().GetRootScene();
+    if (!scene)
+    {
+        return nullptr;
+    }
+    for (Deki::Object* obj : scene->GetObjects())
+    {
+        Deki::Object* holder = Deki::FindInSubtree(
+            obj, [](Deki::Object* o) { return o->GetComponent<DekiRendering::CameraComponent>() != nullptr; });
+        if (holder)
+        {
+            return holder->GetComponent<DekiRendering::CameraComponent>();
+        }
+    }
+    return nullptr;
+}
 
 const char* ItemName(const DekiRendering::RenderProfiler::Entry& e)
 {
@@ -120,6 +154,23 @@ void StartProfile(AnbernicDisplay* display)
 {
     s_Display = display;
     s_On = true;
+    char words[64] = {};
+    if (std::FILE* f = std::fopen("profile", "rb"))
+    {
+        const size_t n = std::fread(words, 1, sizeof(words) - 1, f);
+        words[n] = '\0';
+        std::fclose(f);
+    }
+    if (std::strstr(words, "trace") && display)
+    {
+        display->GetDisplaySize(&s_ScreenW, &s_ScreenH);
+        s_Trace = std::fopen("trace.txt", "wb");
+        if (s_Trace)
+        {
+            std::fputs("# P id us stepMs camX camY: handed over; S id us: up on the panel\n", s_Trace);
+            DEKI_LOG_INFO("Profile: every frame traced to trace.txt");
+        }
+    }
     DekiRendering::RenderProfiler::Enable(&ProfileNowUs);
     DEKI_LOG_INFO("Profile: on, as the file \"profile\" is beside the game; a report every 2 s");
 }
@@ -129,13 +180,38 @@ bool Profiling()
     return s_On;
 }
 
-void ProfileFrame()
+void ProfileShown(uint64_t id, uint64_t us)
+{
+    if (!s_Trace)
+    {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(s_TraceMutex);
+    std::fprintf(s_Trace, "S %llu %llu\n", static_cast<unsigned long long>(id), static_cast<unsigned long long>(us));
+}
+
+void ProfileFrame(uint64_t id)
 {
     if (!s_On)
     {
         return;
     }
     const uint64_t now = ProfileNowUs();
+    if (s_Trace)
+    {
+        // The camera this frame was drawn through, in screen pixels.
+        double camX = 0.0;
+        double camY = 0.0;
+        if (const DekiRendering::CameraComponent* camera = FindCamera())
+        {
+            const DekiRendering::FrameCamera fc = camera->CaptureFrameCamera(s_ScreenW, s_ScreenH);
+            camX = static_cast<double>(fc.camX) * fc.ppm;
+            camY = static_cast<double>(fc.camY) * fc.ppm;
+        }
+        std::lock_guard<std::mutex> lock(s_TraceMutex);
+        std::fprintf(s_Trace, "P %llu %llu %.3f %.2f %.2f\n", static_cast<unsigned long long>(id),
+                     static_cast<unsigned long long>(now), Deki::Time::GetDeltaTimeF(), camX, camY);
+    }
     if (s_LastFrameUs != 0)
     {
         const uint64_t gap = now - s_LastFrameUs;
@@ -155,6 +231,11 @@ void ProfileFrame()
     if (now - s_WindowStartUs >= kWindowUs)
     {
         Report(now - s_WindowStartUs);
+        if (s_Trace)
+        {
+            std::lock_guard<std::mutex> lock(s_TraceMutex);
+            std::fflush(s_Trace);
+        }
         s_Frames = 0;
         s_FrameUs = 0;
         s_LongestUs = 0;
@@ -183,7 +264,10 @@ bool Profiling()
 {
     return false;
 }
-void ProfileFrame()
+void ProfileFrame(uint64_t)
+{
+}
+void ProfileShown(uint64_t, uint64_t)
 {
 }
 uint64_t ProfileNowUs()

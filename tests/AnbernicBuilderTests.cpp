@@ -202,7 +202,7 @@ TEST(AnbernicBuilder, ThePlatformIsDescribedFromItsOptions)
 {
     AnbernicBuilder builder;
     const auto rows = builder.DescribePlatform(Rg40xxH());
-    ASSERT_EQ(rows.size(), 4u);
+    ASSERT_EQ(rows.size(), 5u);
     EXPECT_EQ(rows[0].first, "Toolchain");
     EXPECT_EQ(rows[0].second, std::string("aarch64-none-linux-gnu- (Arm GNU ") + kAnbernicCompilerVersion + ")");
     EXPECT_EQ(rows[1].first, "CPU");
@@ -211,7 +211,36 @@ TEST(AnbernicBuilder, ThePlatformIsDescribedFromItsOptions)
     EXPECT_EQ(rows[2].second, "static");
     EXPECT_EQ(rows[3].first, "Output");
     EXPECT_EQ(rows[3].second, "App in Roms/APPS (stock firmware)");
+    EXPECT_EQ(rows[4].first, "Install over Wi-Fi");
+    EXPECT_EQ(rows[4].second, "off") << "the shipped platform has no address";
     EXPECT_TRUE(Contains(builder.GetDescription(), "stock firmware"));
+}
+
+TEST(AnbernicBuilder, AnAddressOffersTheHandheldOverWiFi)
+{
+    PlatformConfig config = Rg40xxH();
+    SshTarget target;
+    EXPECT_FALSE(AnbernicBuilder::SshTargetOf(config, target));
+    EXPECT_EQ(AnbernicBuilder::SshCardOf(config), "/mnt/mmc");
+
+    config.SetOption("sshHost", "192.168.0.133");
+    ASSERT_TRUE(AnbernicBuilder::SshTargetOf(config, target));
+    EXPECT_EQ(target.user, "root");
+    EXPECT_EQ(target.host, "192.168.0.133");
+
+    AnbernicBuilder builder;
+    builder.SetPlatformConfig(config);
+    bool offered = false;
+    for (const DeployTarget& t : builder.EnumerateDeployTargets())
+    {
+        offered = offered || t.id == "ssh:root@192.168.0.133";
+    }
+    EXPECT_TRUE(offered);
+    EXPECT_EQ(builder.DescribePlatform(config)[4].second, "root@192.168.0.133");
+
+    config.SetOption("sshHost", "192.168.0.133; reboot");
+    EXPECT_FALSE(AnbernicBuilder::SshTargetOf(config, target));
+    EXPECT_FALSE(builder.ValidatePlatform(config).empty());
 }
 
 // --- The toolchain file and the configure line ---

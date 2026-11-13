@@ -12,5 +12,10 @@
     "Scale": "拡大率",
     "Shows the game on an Anbernic handheld's screen.": "Anbernic の携帯ゲーム機の画面にゲームを表示します。",
     "The panel's height in pixels. The RG40XX H's is 480.": "パネルの高さ (ピクセル) です。RG40XX H は 480 です。",
-    "The panel's width in pixels. The RG40XX H's is 640.": "パネルの幅 (ピクセル) です。RG40XX H は 640 です。"
+    "The panel's width in pixels. The RG40XX H's is 640.": "パネルの幅 (ピクセル) です。RG40XX H は 640 です。",
+    "Install over Wi-Fi": "Wi-Fi でインストール",
+    "Address": "アドレス",
+    "User": "ユーザー",
+    "Card Folder": "カードのフォルダー",
+    "With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this computer's SSH key; the package README says how to add it.": "アドレスを入れると、インストール先に SD カードと並んで Wi-Fi 経由の携帯機が出ます。このコンピューターの SSH 鍵でログインします。鍵の追加方法はパッケージの README にあります。"
 }

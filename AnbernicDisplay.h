@@ -81,8 +81,10 @@ private:
         int width = 0;
         int height = 0;
         Deki::ColorFormat format = Deki::ColorFormat::RGB565;
+        uint64_t id = 0;  // which Present it came from, for the profile's trace
     };
     static constexpr int kFrames = 3;
+    uint64_t m_Presents = 0;  // the game's thread's
     Frame m_Frames[kFrames];
     int m_Free = 0;      // the game's; Present moves it
     int m_Pending = -1;  // under m_Mutex; -1 for none

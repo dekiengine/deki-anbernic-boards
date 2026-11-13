@@ -1,6 +1,11 @@
 #include "AnbernicBuilder.h"
 
+#include "SshInstall.h"
 #include "StockApp.h"
+
+#include <deki-editor/EditorTheme.h>
+#include <deki-editor/EditorUI.h>
+#include "imgui.h"
 
 #include <deki-editor/EditorPaths.h>
 #include <deki-editor/EditorSettings.h>
@@ -16,6 +21,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
@@ -277,8 +283,145 @@ std::vector<std::string> AnbernicBuilder::ValidatePlatform(const PlatformConfig&
     {
         problems.push_back("screenWidth and screenHeight must be set: the game renders at that size");
     }
+
+    const std::string host = config.Option("sshHost");
+    if (!host.empty() && !SshNameIsPlain(host))
+    {
+        problems.push_back("frameworkOptions.sshHost '" + host + "' is not an address (letters, digits and . - _ :)");
+    }
+    const std::string user = config.Option("sshUser");
+    if (!user.empty() && !SshNameIsPlain(user))
+    {
+        problems.push_back("frameworkOptions.sshUser '" + user + "' is not a user name");
+    }
+    const std::string card = config.Option("sshCard");
+    if (!card.empty() && !SshPathIsPlain(card))
+    {
+        problems.push_back("frameworkOptions.sshCard '" + card + "' is not a plain folder such as /mnt/mmc");
+    }
     return problems;
 }
+
+bool AnbernicBuilder::SshTargetOf(const PlatformConfig& config, SshTarget& target)
+{
+    SshTarget t;
+    t.host = config.Option("sshHost");
+    t.user = config.Option("sshUser", "root");
+    if (t.host.empty() || !SshNameIsPlain(t.host) || !SshNameIsPlain(t.user))
+    {
+        return false;
+    }
+    target = t;
+    return true;
+}
+
+std::string AnbernicBuilder::SshCardOf(const PlatformConfig& config)
+{
+    return config.Option("sshCard", "/mnt/mmc");
+}
+
+namespace
+{
+// The screen size, as every platform has, and where Install over Wi-Fi goes.
+class AnbernicEditorUI : public IPlatformEditorUI
+{
+public:
+    explicit AnbernicEditorUI(const PlatformConfig& config)
+    {
+        m_ScreenWidth = config.screenWidth > 0 ? config.screenWidth : 640;
+        m_ScreenHeight = config.screenHeight > 0 ? config.screenHeight : 480;
+        Copy(m_Host, config.Option("sshHost"));
+        Copy(m_User, config.Option("sshUser", "root"));
+        Copy(m_Card, config.Option("sshCard", "/mnt/mmc"));
+    }
+
+    void Draw() override
+    {
+        if (SchematicSectionBegin("Display"))
+        {
+            BeginPropertyContext();
+            EditorUI::Get().PropertyRow("Resolution");
+            const float gap = ImGui::GetStyle().ItemSpacing.x;
+            const float fieldW = (ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("x").x - gap * 2.0f) * 0.5f;
+            ImGui::SetNextItemWidth(fieldW);
+            SchematicDragInt("##ScreenWidth", &m_ScreenWidth, 1.0f, 1, 16384);
+            ImGui::SameLine(0.0f, gap);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextColored(Palette::Dim, "x");
+            ImGui::SameLine(0.0f, gap);
+            ImGui::SetNextItemWidth(fieldW);
+            SchematicDragInt("##ScreenHeight", &m_ScreenHeight, 1.0f, 1, 16384);
+            m_ScreenWidth = std::max(m_ScreenWidth, 1);
+            m_ScreenHeight = std::max(m_ScreenHeight, 1);
+            EndPropertyContext();
+            SchematicSectionEnd();
+        }
+        if (SchematicSectionBegin("Install over Wi-Fi"))
+        {
+            BeginPropertyContext();
+            EditorUI& ui = EditorUI::Get();
+            ui.PropertyRow("Address");
+            ui.InputTextWithHint("##SshHost", "192.168.0.133", m_Host, sizeof(m_Host));
+            ui.PropertyRow("User");
+            ui.InputText("##SshUser", m_User, sizeof(m_User));
+            ui.PropertyRow("Card Folder");
+            ui.InputText("##SshCard", m_Card, sizeof(m_Card));
+            EndPropertyContext();
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(Palette::Dim, "%s",
+                               Tr("With an address, Install offers the handheld over Wi-Fi beside its SD card. It "
+                                  "logs in with this computer's SSH key; the package README says how to add it."));
+            ImGui::PopTextWrapPos();
+            SchematicSectionEnd();
+        }
+    }
+
+    void ApplyToConfig(PlatformConfig& config) const override
+    {
+        config.screenWidth = m_ScreenWidth;
+        config.screenHeight = m_ScreenHeight;
+        config.SetOption("sshHost", Trimmed(m_Host));
+        config.SetOption("sshUser", Trimmed(m_User).empty() ? "root" : Trimmed(m_User));
+        config.SetOption("sshCard", Trimmed(m_Card).empty() ? "/mnt/mmc" : Trimmed(m_Card));
+    }
+
+private:
+    static void Copy(char (&to)[128], const std::string& from)
+    {
+        const size_t n = std::min(from.size(), sizeof(to) - 1);
+        std::memcpy(to, from.data(), n);
+        to[n] = '\0';
+    }
+    static std::string Trimmed(const char* text)
+    {
+        std::string s = text;
+        const size_t first = s.find_first_not_of(" \t");
+        const size_t last = s.find_last_not_of(" \t");
+        return first == std::string::npos ? std::string() : s.substr(first, last - first + 1);
+    }
+
+    int m_ScreenWidth = 640;
+    int m_ScreenHeight = 480;
+    char m_Host[128] = "";
+    char m_User[128] = "";
+    char m_Card[128] = "";
+};
+}  // namespace
+
+std::unique_ptr<IPlatformEditorUI> AnbernicBuilder::CreateEditorUI(const PlatformConfig& config) const
+{
+    return std::make_unique<AnbernicEditorUI>(config);
+}
+
+// The texts above, marked so the translation table has them.
+[[maybe_unused]] static constexpr const char* kAnbernicEditorTexts[] = {
+    TrMark("Install over Wi-Fi"),
+    TrMark("Address"),
+    TrMark("User"),
+    TrMark("Card Folder"),
+    TrMark("With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this "
+           "computer's SSH key; the package README says how to add it."),
+};
 
 std::vector<std::pair<std::string, std::string>> AnbernicBuilder::DescribePlatform(const PlatformConfig& config) const
 {
@@ -287,6 +430,8 @@ std::vector<std::pair<std::string, std::string>> AnbernicBuilder::DescribePlatfo
     rows.push_back({ "CPU", config.Option("cpuFlags") });
     rows.push_back({ "Linking", config.OptionBool("static") ? "static" : "dynamic" });
     rows.push_back({ "Output", "App in Roms/APPS (stock firmware)" });
+    SshTarget ssh;
+    rows.push_back({ "Install over Wi-Fi", SshTargetOf(config, ssh) ? ssh.user + "@" + ssh.host : "off" });
     return rows;
 }
 
@@ -595,12 +740,27 @@ void AnbernicBuilder::DoClean(const std::string& projectPath, BuildOutputCallbac
 
 std::vector<DeployTarget> AnbernicBuilder::EnumerateDeployTargets() const
 {
-    return FindAnbernicCards();
+    std::vector<DeployTarget> targets = FindAnbernicCards();
+    SshTarget ssh;
+    if (SshTargetOf(m_PlatformConfig, ssh))
+    {
+        targets.push_back({ SshTargetId(ssh), m_PlatformConfig.displayName + " over Wi-Fi (" + ssh.host + ")" });
+    }
+    return targets;
 }
 
 void AnbernicBuilder::Deploy(const std::string& projectPath, const std::string& deployTargetId,
                              BuildOutputCallback outputCallback, BuildProgressCallback progressCallback)
 {
+    // Over Wi-Fi: "ssh:user@host", the platform's or one given.
+    SshTarget ssh;
+    if (ParseSshTarget(deployTargetId, ssh))
+    {
+        RunOnBuildThread([this, projectPath, ssh, outputCallback, progressCallback]()
+                         { DoDeployOverSsh(projectPath, ssh, outputCallback, progressCallback); });
+        return;
+    }
+
     // Only a card that is listed: an id from somewhere else could name any
     // folder, and an install deletes the app it replaces.
     const std::vector<DeployTarget> cards = FindAnbernicCards();
@@ -659,6 +819,35 @@ void AnbernicBuilder::Deploy(const std::string& projectPath, const std::string& 
     }
     RunOnBuildThread([this, projectPath, cardId, outputCallback, progressCallback]()
                      { DoDeploy(projectPath, cardId, outputCallback, progressCallback); });
+}
+
+void AnbernicBuilder::DoDeployOverSsh(const std::string& projectPath, const SshTarget& target, BuildOutputCallback out,
+                                      BuildProgressCallback progress)
+{
+    const std::string folder = StockAppFolderName(ProjectName(projectPath));
+    const fs::path apps = fs::path(GetBuildDirectory(projectPath)) / "APPS";
+    const std::string card = SshCardOf(m_PlatformConfig);
+    Report(BuildState::Deploying, "Installing on " + target.host + "...", 0.0f, progress);
+    if (out)
+    {
+        out("Installing " + folder + " in " + card + "/Roms/APPS on " + target.user + "@" + target.host, false);
+    }
+    std::string error;
+    const bool ok = InstallStockAppOverSsh(
+        apps, target, card, folder, out, [&](float value, const std::string& text)
+        { Report(BuildState::Deploying, text, value, progress); }, &m_CancelRequested, error);
+    if (!ok)
+    {
+        Fail("Install failed: " + error, out, progress);
+        return;
+    }
+    if (out)
+    {
+        out("Installed " + folder + " on " + target.host + ". It is in the handheld's Apps list as " + folder +
+                "; if it was already open there, quit it with Menu and start it again.",
+            false);
+    }
+    Report(BuildState::Completed, "Installed on " + target.host, 1.0f, progress);
 }
 
 void AnbernicBuilder::DoDeploy(const std::string& projectPath, const std::string& cardId, BuildOutputCallback out,

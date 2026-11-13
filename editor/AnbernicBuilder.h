@@ -26,6 +26,7 @@
 #include <deki-editor/build/FirmwareBuilderBase.h>
 
 #include "AnbernicToolchain.h"
+#include "SshInstall.h"
 
 #include <filesystem>
 #include <string>
@@ -74,6 +75,15 @@ public:
     std::string GetFrameworkId() const override { return "anbernic"; }
     std::vector<std::pair<std::string, std::string>> DescribePlatform(const PlatformConfig& config) const override;
     std::vector<std::string> ValidatePlatform(const PlatformConfig& config) const override;
+    // The screen size and Install over Wi-Fi (frameworkOptions sshHost,
+    // sshUser, sshCard), in the platform editor.
+    std::unique_ptr<IPlatformEditorUI> CreateEditorUI(const PlatformConfig& config) const override;
+
+    /// The handheld's address for Install over Wi-Fi, from the platform
+    /// (frameworkOptions sshHost and sshUser); false when it has none.
+    static bool SshTargetOf(const PlatformConfig& config, SshTarget& target);
+    /// The folder the handheld's card is at (frameworkOptions sshCard).
+    static std::string SshCardOf(const PlatformConfig& config);
 
     std::string GetBuildDirectory(const std::string& projectPath) const override;
     // The boot payload, which the app takes as its flash/ (F:/ on the device).
@@ -107,6 +117,8 @@ private:
     void DoClean(const std::string& projectPath, BuildOutputCallback out, BuildProgressCallback progress);
     void DoDeploy(const std::string& projectPath, const std::string& cardId, BuildOutputCallback out,
                   BuildProgressCallback progress);
+    void DoDeployOverSsh(const std::string& projectPath, const SshTarget& target, BuildOutputCallback out,
+                         BuildProgressCallback progress);
 
     bool CompilerInstalled() const;
     // Runs `command` in `workDir`, its output to `out`. The exit code.

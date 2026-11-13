@@ -61,6 +61,29 @@ Only the editor's own app is ever replaced. An app of the same name installed an
 
 Without Install: copy what is in `APPS/` into `Roms/APPS/` on the card yourself.
 
+## Install over Wi-Fi
+
+With the handheld on the same Wi-Fi, **Install** can put the game on it with the card still inside. Give the platform the handheld's address (Build panel, edit the platform, **Install over Wi-Fi > Address**); the target list then offers it beside the cards. From the command line, the target is `ssh:root@<address>`:
+
+```
+DekiEditor --tool deploy_build --args '{"target":"ssh:root@192.168.0.133"}' <project>
+```
+
+It copies over SSH with the computer's own `ssh` and `scp` (on Windows, the built-in OpenSSH Client), and does what an install onto the card does: the app goes to a hidden folder first, every file is checked against the build before it replaces the old app, the script goes last, and an app the editor did not install is left alone. Then start the game from the Apps list; if it was open, quit it with Menu first.
+
+Once, on the handheld:
+
+1. Turn on its SSH server. On the stock firmware with the Modified System add-on: **Apps > Modified System Settings > SSH Service > Enable** (its user is `root`, password `root`). "Enable Temporarily" turns it off again at the next restart.
+2. Find its address, in its Wi-Fi settings or the router's list of devices.
+
+Once, on the computer, add its SSH key to the handheld (the editor logs in with the key only, never a password). In a terminal, with the handheld's address, type `root` when asked:
+
+```
+ssh root@192.168.0.133 "mkdir -p ~/.ssh && chmod go-w ~ && chmod 700 ~/.ssh && echo '<your key>' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+```
+
+where `<your key>` is the one line in `~/.ssh/id_ed25519.pub` (or `id_rsa.pub`; `ssh-keygen` makes one if there is none). The `chmod go-w ~` matters: the stock firmware leaves `/root` writable by everyone, and the SSH server then ignores the key.
+
 ## The handheld
 
 Boot order, as the boot scene lists it:

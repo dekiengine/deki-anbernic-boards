@@ -12,5 +12,10 @@
     "Scale": "배율",
     "Shows the game on an Anbernic handheld's screen.": "Anbernic 휴대용 게임기의 화면에 게임을 표시합니다.",
     "The panel's height in pixels. The RG40XX H's is 480.": "패널의 높이(픽셀)입니다. RG40XX H는 480입니다.",
-    "The panel's width in pixels. The RG40XX H's is 640.": "패널의 너비(픽셀)입니다. RG40XX H는 640입니다."
+    "The panel's width in pixels. The RG40XX H's is 640.": "패널의 너비(픽셀)입니다. RG40XX H는 640입니다.",
+    "Install over Wi-Fi": "Wi-Fi로 설치",
+    "Address": "주소",
+    "User": "사용자",
+    "Card Folder": "카드 폴더",
+    "With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this computer's SSH key; the package README says how to add it.": "주소를 넣으면 설치 대상에 SD 카드와 함께 Wi-Fi로 연결된 휴대기가 나옵니다. 이 컴퓨터의 SSH 키로 로그인하며, 키를 추가하는 방법은 패키지 README에 있습니다."
 }

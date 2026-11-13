@@ -98,3 +98,14 @@ TEST(AnbernicInput, AnAxisWithNoRangePointsNowhere)
     EXPECT_EQ(AnbernicInput::DirectionOf(100, 0, 0), 0);
     EXPECT_EQ(AnbernicInput::DirectionOf(3, 9, 1), 0);
 }
+
+TEST(AnbernicInput, AnAxisIsReadFromMinusOneToOneOverItsRange)
+{
+    using DekiAnbernic::AnbernicInput;
+    EXPECT_FLOAT_EQ(AnbernicInput::AxisPosition(0, -4096, 4096), 0.0f);
+    EXPECT_FLOAT_EQ(AnbernicInput::AxisPosition(4096, -4096, 4096), 1.0f);
+    EXPECT_FLOAT_EQ(AnbernicInput::AxisPosition(-2048, -4096, 4096), -0.5f);
+    EXPECT_FLOAT_EQ(AnbernicInput::AxisPosition(2048, 0, 4096), 0.0f);  // a range that starts at 0
+    EXPECT_FLOAT_EQ(AnbernicInput::AxisPosition(9000, -4096, 4096), 1.0f) << "past the range is the end";
+    EXPECT_FLOAT_EQ(AnbernicInput::AxisPosition(5, 5, 5), 0.0f) << "no range";
+}

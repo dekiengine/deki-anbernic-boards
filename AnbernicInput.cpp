@@ -170,8 +170,49 @@ void AnbernicInput::Press(uint32_t key, bool down)
     Notify(event);
 }
 
+float AnbernicInput::AxisPosition(int32_t value, int32_t low, int32_t high)
+{
+    if (high <= low)
+    {
+        return 0.0f;
+    }
+    const float position = (2.0f * static_cast<float>(value) - static_cast<float>(low) - static_cast<float>(high)) /
+                           static_cast<float>(high - low);
+    return position < -1.0f ? -1.0f : (position > 1.0f ? 1.0f : position);
+}
+
+bool AnbernicInput::GetStick(int stick, float* x, float* y) const
+{
+    // The stock firmware reports the left stick as ABS_Z and ABS_RX and the
+    // right as ABS_RY and ABS_RZ; another may use ABS_X and ABS_Y for the left.
+    if (stick != 0 && stick != 1)
+    {
+        return false;
+    }
+    for (const Device& device : m_Devices)
+    {
+        uint16_t codeX = stick == 0 ? 2 : 4;
+        uint16_t codeY = stick == 0 ? 3 : 5;
+        if (stick == 0 && device.axes[codeX].high <= device.axes[codeX].low)
+        {
+            codeX = 0;
+            codeY = 1;
+        }
+        const Axis& ax = device.axes[codeX];
+        const Axis& ay = device.axes[codeY];
+        if (ax.high > ax.low && ay.high > ay.low)
+        {
+            *x = AxisPosition(ax.value, ax.low, ax.high);
+            *y = -AxisPosition(ay.value, ay.low, ay.high);  // the device's down is positive
+            return true;
+        }
+    }
+    return false;
+}
+
 void AnbernicInput::MoveAxis(Axis& axis, uint16_t code, int32_t value)
 {
+    axis.value = value;
     uint32_t low = 0;
     uint32_t high = 0;
     if (!KeysForAxis(code, &low, &high))
@@ -280,6 +321,7 @@ bool AnbernicInput::Initialize()
             {
                 device.axes[code].low = info.minimum;
                 device.axes[code].high = info.maximum;
+                device.axes[code].value = info.value;
             }
         }
         DEKI_LOG_INFO("AnbernicInput: reading the buttons from \"%s\"", device.name.c_str());

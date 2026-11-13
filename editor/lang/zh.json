@@ -12,5 +12,10 @@
     "Scale": "缩放",
     "Shows the game on an Anbernic handheld's screen.": "在 Anbernic 掌机的屏幕上显示游戏。",
     "The panel's height in pixels. The RG40XX H's is 480.": "面板的高度（像素）。RG40XX H 为 480。",
-    "The panel's width in pixels. The RG40XX H's is 640.": "面板的宽度（像素）。RG40XX H 为 640。"
+    "The panel's width in pixels. The RG40XX H's is 640.": "面板的宽度（像素）。RG40XX H 为 640。",
+    "Install over Wi-Fi": "通过 Wi-Fi 安装",
+    "Address": "地址",
+    "User": "用户",
+    "Card Folder": "存储卡文件夹",
+    "With an address, Install offers the handheld over Wi-Fi beside its SD card. It logs in with this computer's SSH key; the package README says how to add it.": "填写地址后，安装目标中会在 SD 卡旁出现通过 Wi-Fi 连接的掌机。它使用这台电脑的 SSH 密钥登录；添加密钥的方法见包的 README。"
 }

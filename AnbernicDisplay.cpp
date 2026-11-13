@@ -294,7 +294,7 @@ void AnbernicDisplay::Present(const uint8_t* framebuffer, int width, int height,
     {
         return;
     }
-    ProfileFrame();
+    ProfileFrame(++m_Presents);
 
     // Wait while the thread still has the frame before this one waiting. The
     // free buffer is the game's alone, so it is filled outside the lock.
@@ -321,6 +321,7 @@ void AnbernicDisplay::Present(const uint8_t* framebuffer, int width, int height,
     frame.width = width;
     frame.height = height;
     frame.format = format;
+    frame.id = m_Presents;
 
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
@@ -436,6 +437,7 @@ void AnbernicDisplay::Draw(const Frame& frame)
     timespec t{};
     clock_gettime(CLOCK_MONOTONIC, &t);
     const uint64_t shownUs = static_cast<uint64_t>(t.tv_sec) * 1000000u + static_cast<uint64_t>(t.tv_nsec) / 1000u;
+    ProfileShown(frame.id, shownUs);
     std::lock_guard<std::mutex> lock(m_ShownMutex);
     ++m_FramesShown;
     m_FrameShownAtUs = shownUs;
