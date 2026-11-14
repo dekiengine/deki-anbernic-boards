@@ -4,7 +4,7 @@ Build target for the Anbernic RG40XX H. Install the package, pick **Anbernic RG4
 
 | Target | Handheld | Screen | Input |
 | --- | --- | --- | --- |
-| `anbernic_rg40xx_h` | Anbernic RG40XX H | 640x480 ARGB8888, the panel's own size, through the Linux framebuffer | The buttons, the d-pad and the left stick, as keys, through `deki-input` |
+| `anbernic_rg40xx_h` | Anbernic RG40XX H | 640x480 ARGB8888, the panel's own size, through the Linux framebuffer | The buttons, the d-pad and the left stick as keys, and both sticks as sticks, through `deki-input` |
 
 The RG40XX H was provided by Anbernic. It has an Allwinner H700 (four Cortex-A53 cores) and 1 GB of memory, and its stock firmware is a 64-bit Linux. Other Anbernic handhelds with the same chip (RG35XX H, RG35XX Plus, RG40XX V, RG CubeXX and others) run the same firmware and are expected to follow as targets in this package.
 
@@ -89,8 +89,8 @@ where `<your key>` is the one line in `~/.ssh/id_ed25519.pub` (or `id_rsa.pub`; 
 Boot order, as the boot scene lists it:
 
 1. Display: `AnbernicDisplaySetup` opens `/dev/fb0`, sets it to the panel's size (640x480) in ARGB8888 with two pages, and scales the game's screen by whole pixels to fill it. Frames are presented on their own thread, in step with the panel's refresh. The game draws into three buffers the display lends it, so a frame is handed to that thread without a copy. When the game quits, the framebuffer goes back to the mode the firmware had. The log says what it found and what it set.
-2. Input: `AnbernicInputSetup` reads the buttons from the device the firmware names `ANBERNIC-keys` and sends them as keys: the d-pad and the left stick as the arrows, A and Start as Enter, B as Esc, X as Space, Y as Tab, Select as Backspace, L1/R1 as Q/E, L2/R2 as Z/C. **Menu** quits the game, back to the firmware's menu.
+2. Input: `AnbernicInputSetup` reads the buttons from the device the firmware names `ANBERNIC-keys` and sends them as keys: the d-pad and the left stick as the arrows, A and Start as Enter, B as Esc, X as Space, Y as Tab, Select as Backspace, L1/R1 as Q/E, L2/R2 as Z/C. **Menu** quits the game, back to the firmware's menu. Both sticks are also read as sticks (`DekiInput::GetStick`), from -1 to 1 over each axis' own range.
 
 Memory: the platform states 512 MB (`externalMemorySize`), what a game can use. Not measured yet.
 
-Not set up: sound, the right stick, battery reading, brightness, rumble, HDMI out.
+Not set up: sound, battery reading, brightness, rumble, HDMI out.
