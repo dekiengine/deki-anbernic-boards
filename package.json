@@ -2,7 +2,7 @@
   "id": "deki-anbernic-boards",
   "displayName": "Anbernic Boards",
   "description": "Build targets for Anbernic handhelds: RG40XX H",
-  "minEngine": "0.30.0",
+  "minEngine": "0.40.0",
   "buildDefine": "DEKI_PACKAGE_ANBERNIC",
   "platformRequires": [
     "anbernic"

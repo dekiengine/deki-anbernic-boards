@@ -3,7 +3,7 @@
 Notable changes to `deki-anbernic-boards`. Engine and editor changes are in the
 [engine changelog](https://github.com/dekiengine/deki-engine/blob/master/CHANGELOG.md).
 
-## Unreleased
+## 0.40.0
 
 ### The Anbernic RG40XX H as a build target
 - `anbernic_rg40xx_h`: 640x480 ARGB8888, cross-compiled with Arm's
