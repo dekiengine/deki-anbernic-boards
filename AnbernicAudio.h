@@ -11,6 +11,8 @@
 #include "IDekiAudio.h"  // from deki-audio
 #include "PumpWorker.h"  // from deki-audio
 #include <deki/PackageConfig.h>
+#include <deki/providers/Buffer.h>
+#include <atomic>
 #include <string>
 
 namespace DekiAnbernic
@@ -29,8 +31,9 @@ public:
     const char* GetPackageName() const override { return "Anbernic Audio"; }
     /// Reads "card" (0), "device" (0), "sampleRate" (48000) and "channels" (2).
     void Configure(const Deki::PackageConfig& config) override;
-    /// Opens the device and sets its format. The rate and channels it takes
-    /// may differ from those asked for; GetSampleRate and GetChannels say.
+    /// Mutes the chip, opens the device and sets its format. The rate and
+    /// channels it takes may differ from those asked for; GetSampleRate and
+    /// GetChannels say.
     bool Initialize() override;
     void Shutdown() override;
     void Update(float) override {}
@@ -50,6 +53,8 @@ public:
 
 private:
     bool SetFormat();
+    bool WriteRaw(const int16_t* samples, size_t frames);
+    bool WriteSilence(int periods);
 
     DekiAudio::PumpWorker m_Pump;
     int m_Fd = -1;
@@ -58,6 +63,24 @@ private:
     int m_SampleRate = 48000;
     int m_Channels = 2;
     int m_PeriodFrames = 512;
+    // The sound fades in over kFadeInMs once it starts and out over
+    // kFadeOutMs before the device closes, and the chip's level changes only
+    // in kSilentPeriods of silence around them: no pop and no click.
+    enum class Phase
+    {
+        Starting,
+        FadingIn,
+        Playing,
+        FadingOut,
+        Done,
+    };
+    static constexpr int kFadeInMs = 150;
+    static constexpr int kFadeOutMs = 120;
+    static constexpr int kSilentPeriods = 2;
+    Phase m_Phase = Phase::Starting;
+    int m_FadeAt = 0;
+    std::atomic<bool> m_FadingOut{ false };
+    Deki::Buffer<int16_t> m_Faded;
     Deki::PackageState m_State = Deki::PackageState::Uninitialized;
     std::string m_LastError;
 };

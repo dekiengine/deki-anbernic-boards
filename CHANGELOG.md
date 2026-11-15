@@ -13,6 +13,9 @@ Notable changes to `deki-anbernic-boards`. Engine and editor changes are in the
 - **The volume follows the launcher.** A game starts at the stock launcher's
   volume (0 to 10), the volume buttons change it, and the launcher shows the
   game's level after it quits.
+- **No pop when a game starts or quits.** The codec is muted while its
+  amplifier powers up and down, the sound fades in and out over a tenth of a
+  second, and the volume changes only while the sound is silent.
 
 ## 0.40.0
 

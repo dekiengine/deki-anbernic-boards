@@ -20,6 +20,9 @@ void AnbernicAudioSetup::Setup(SetupCallback onComplete)
     // deki-audio starts here. Safe to repeat.
     DekiAudioInitSystem();
 
+    // The mixer first, so it is destroyed after the output that reads it
+    // when the game quits.
+    DekiAudio::Mixer::Instance();
     static AnbernicAudio s_Audio;
     Deki::PackageConfig config;
     config.packageId = "audio";

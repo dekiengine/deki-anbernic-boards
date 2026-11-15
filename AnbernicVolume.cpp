@@ -68,6 +68,7 @@ bool AnbernicVolume::SetLevelInLauncherSettings(unsigned char* data, unsigned lo
 
 #include <deki/LogSystem.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -94,7 +95,10 @@ bool s_Tried = false;
 snd_ctl_elem_id s_Id{};
 long s_Max = 0;
 long s_Original = -1;
-int s_Level = AnbernicVolume::kMaxLevel;
+// The level is set by the game thread (the buttons) and the fade by the
+// sound thread; each write uses both.
+std::atomic<int> s_Level{ AnbernicVolume::kMaxLevel };
+std::atomic<int> s_Fade{ AnbernicVolume::kFadeFull };
 
 bool OpenControl()
 {
@@ -193,16 +197,42 @@ int ReadLauncherLevel()
 }
 }  // namespace
 
-void AnbernicVolume::ApplySystemLevel()
+// The control's value for the level, scaled by the fade.
+long Scaled()
 {
-    const int level = ReadLauncherLevel();
-    if (level < 0 || !OpenControl())
+    return AnbernicVolume::ControlValueForLevel(s_Level.load(), s_Max) * s_Fade.load() / AnbernicVolume::kFadeFull;
+}
+
+void AnbernicVolume::BeginMuted()
+{
+    if (!OpenControl())
     {
         return;
     }
-    s_Level = level;
-    Write(ControlValueForLevel(s_Level, s_Max));
-    DEKI_LOG_INFO("AnbernicVolume: the launcher's volume, %d of %d", s_Level, kMaxLevel);
+    const int level = ReadLauncherLevel();
+    if (level >= 0)
+    {
+        s_Level = level;
+        DEKI_LOG_INFO("AnbernicVolume: the launcher's volume, %d of %d", level, kMaxLevel);
+    }
+    s_Fade = 0;
+    Write(0);
+}
+
+void AnbernicVolume::SetFade(int fade)
+{
+    fade = fade < 0 ? 0 : (fade > kFadeFull ? kFadeFull : fade);
+    if (s_Fd < 0 || fade == s_Fade.load())
+    {
+        return;
+    }
+    const long before = Scaled();
+    s_Fade = fade;
+    const long after = Scaled();
+    if (after != before)
+    {
+        Write(after);
+    }
 }
 
 bool AnbernicVolume::Step(int direction)
@@ -211,10 +241,11 @@ bool AnbernicVolume::Step(int direction)
     {
         return false;
     }
-    s_Level += direction > 0 ? 1 : -1;
-    s_Level = s_Level < 0 ? 0 : (s_Level > kMaxLevel ? kMaxLevel : s_Level);
-    const bool set = Write(ControlValueForLevel(s_Level, s_Max));
-    WriteLauncherLevel(s_Level);
+    int level = s_Level.load() + (direction > 0 ? 1 : -1);
+    level = level < 0 ? 0 : (level > kMaxLevel ? kMaxLevel : level);
+    s_Level = level;
+    const bool set = Write(Scaled());
+    WriteLauncherLevel(level);
     return set;
 }
 
@@ -236,6 +267,7 @@ void AnbernicVolume::Restore()
     s_Fd = -1;
     s_Tried = false;
     s_Original = -1;
+    s_Fade = kFadeFull;
 }
 
 }  // namespace DekiAnbernic
@@ -245,7 +277,11 @@ void AnbernicVolume::Restore()
 namespace DekiAnbernic
 {
 
-void AnbernicVolume::ApplySystemLevel()
+void AnbernicVolume::BeginMuted()
+{
+}
+
+void AnbernicVolume::SetFade(int)
 {
 }
 

@@ -15,10 +15,17 @@ public:
     /// The launcher's scale.
     static constexpr int kMaxLevel = 10;
 
-    /// Reads the launcher's level and sets the chip to it. Called when the
-    /// sound starts; does nothing where there is no launcher setting or no
-    /// such control.
-    static void ApplySystemLevel();
+    /// A fade's full value: the level as it is.
+    static constexpr int kFadeFull = 256;
+
+    /// Reads the launcher's level and mutes the chip, before the sound device
+    /// opens: the amplifier then powers up silent, and SetFade brings the
+    /// level in. Does nothing where the chip has no such control.
+    static void BeginMuted();
+
+    /// Scales the level by `fade` out of kFadeFull: the sound thread fades in
+    /// after the device starts and out before it closes, so neither pops.
+    static void SetFade(int fade);
 
     /// One step up (+1) or down (-1). False when the chip has no control.
     static bool Step(int direction);
@@ -26,7 +33,8 @@ public:
     /// The level now, 0..kMaxLevel.
     static int GetLevel();
 
-    /// Puts the chip back as the game found it.
+    /// Puts the chip back as the game found it. Called after the device is
+    /// closed.
     static void Restore();
 
     /// The chip's line-out value for `level`: 0 is silent, kMaxLevel full, and
