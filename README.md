@@ -90,7 +90,8 @@ Boot order, as the boot scene lists it:
 
 1. Display: `AnbernicDisplaySetup` opens `/dev/fb0`, sets it to the panel's size (640x480) in ARGB8888 with two pages, and scales the game's screen by whole pixels to fill it. Frames are presented on their own thread, in step with the panel's refresh. The game draws into three buffers the display lends it, so a frame is handed to that thread without a copy. When the game quits, the framebuffer goes back to the mode the firmware had. The log says what it found and what it set.
 2. Input: `AnbernicInputSetup` reads the buttons from the device the firmware names `ANBERNIC-keys` and sends them as keys: the d-pad and the left stick as the arrows, A and Start as Enter, B as Esc, X as Space, Y as Tab, Select as Backspace, L1/R1 as Q/E, L2/R2 as Z/C. **Menu** quits the game, back to the firmware's menu. Both sticks are also read as sticks (`DekiInput::GetStick`), from -1 to 1 over each axis' own range.
+3. Sound: `AnbernicAudioSetup` plays deki-audio's sound on the H700's own codec (ALSA card 0, device 0) at 48 kHz stereo, written straight to the kernel's sound device. It starts at the volume the stock launcher has (0 to 10), and the volume buttons change it in the game and for the launcher too, which shows the new level after the game. Without deki-audio in the project there is no sound and the game starts as usual.
 
 Memory: the platform states 512 MB (`externalMemorySize`), what a game can use. Not measured yet.
 
-Not set up: sound, battery reading, brightness, rumble, HDMI out.
+Not set up: battery reading, brightness, rumble, HDMI out.

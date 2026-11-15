@@ -27,6 +27,17 @@
       "componentTypes": [
         "AnbernicInputSetup"
       ]
+    },
+    {
+      "id": "audio",
+      "displayName": "Audio",
+      "defaultEnabled": true,
+      "componentTypes": [
+        "AnbernicAudioSetup"
+      ],
+      "requires": [
+        "deki-audio"
+      ]
     }
   ],
   "dependencies": {

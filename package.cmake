@@ -11,6 +11,10 @@ set(PACKAGE_SOURCES
     AnbernicRows.cpp
     AnbernicInput.cpp
     AnbernicProfile.cpp
+    AnbernicAudio.cpp
+    AnbernicAudioSetup.cpp
+    AnbernicVolume.cpp
 )
 set(PACKAGE_ENTRY AnbernicPackage.cpp)
-set(PACKAGE_LINK_DEPS deki-input deki-rendering)
+# deki-audio links only when the project has it: see the audio feature.
+set(PACKAGE_LINK_DEPS deki-input deki-rendering deki-audio)

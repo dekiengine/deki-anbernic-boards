@@ -1,4 +1,5 @@
 #include "AnbernicInput.h"
+#include "AnbernicVolume.h"
 #include "Keys.h"  // from deki-input
 
 #include <deki/Time.h>
@@ -342,6 +343,8 @@ void AnbernicInput::Shutdown()
     m_Devices.clear();
     m_KeyDownCount.clear();
     m_Initialized = false;
+    // The system's level, as the game found it.
+    AnbernicVolume::Restore();
 }
 
 void AnbernicInput::Update()
@@ -358,6 +361,16 @@ void AnbernicInput::Update()
             if (ev.type == EV_ABS && ev.code < 64)
             {
                 MoveAxis(device.axes[ev.code], ev.code, ev.value);
+                continue;
+            }
+            // The volume buttons turn the handheld's own volume, repeating
+            // while held; the game sees no key for them.
+            if (ev.type == EV_KEY && (ev.code == KEY_VOLUMEUP || ev.code == KEY_VOLUMEDOWN))
+            {
+                if (ev.value != 0)
+                {
+                    AnbernicVolume::Step(ev.code == KEY_VOLUMEUP ? 1 : -1);
+                }
                 continue;
             }
             // value 2 is the kernel's auto-repeat; the engine repeats on its own.

@@ -3,6 +3,17 @@
 Notable changes to `deki-anbernic-boards`. Engine and editor changes are in the
 [engine changelog](https://github.com/dekiengine/deki-engine/blob/master/CHANGELOG.md).
 
+## Unreleased
+
+### Added
+- **Sound.** `AnbernicAudioSetup`, in the RG40XX H boot scene, plays
+  deki-audio's mixer on the handheld's speaker and headphones (ALSA card 0,
+  device 0, 48 kHz stereo), through the kernel's sound device: the game is a
+  static program with no sound library. Without deki-audio it does nothing.
+- **The volume follows the launcher.** A game starts at the stock launcher's
+  volume (0 to 10), the volume buttons change it, and the launcher shows the
+  game's level after it quits.
+
 ## 0.40.0
 
 ### The Anbernic RG40XX H as a build target

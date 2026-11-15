@@ -45,6 +45,30 @@
             "x": 0.0,
             "y": 0.0
           }
+        },
+        {
+          "active": true,
+          "children": [],
+          "components": [
+            {
+              "properties": {
+                "card": 0,
+                "device": 0,
+                "initialVolume": 100,
+                "sampleRate": 48000
+              },
+              "type": "DekiAnbernic::AnbernicAudioSetup"
+            }
+          ],
+          "id": 602,
+          "name": "Anbernic Audio",
+          "transform": {
+            "rotation": 0.0,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "x": 0.0,
+            "y": 0.0
+          }
         }
       ],
       "components": [
@@ -58,6 +82,10 @@
               {
                 "id": 601,
                 "typeId": 2982312043
+              },
+              {
+                "id": 602,
+                "typeId": 3640240289
               }
             ]
           },
